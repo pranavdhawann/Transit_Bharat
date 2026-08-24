@@ -1,0 +1,466 @@
+[
+  {
+    "id": "bus:620U",
+    "number": "620U",
+    "name": "Munirka Village (T) - Regal",
+    "color": "#2563eb",
+    "speedKmh": 16,
+    "cycleMinutes": 93,
+    "vehicles": 5,
+    "gtfsRouteId": "5252",
+    "gtfsLongName": "620UP",
+    "corridorKm": 11.05,
+    "stops": [
+      {
+        "id": "b:1062",
+        "name": "Munirka Village (T)",
+        "lat": 28.5585,
+        "lon": 77.173717
+      },
+      {
+        "id": "b:1224",
+        "name": "Vasant Vihar Depot",
+        "lat": 28.558917,
+        "lon": 77.172067
+      },
+      {
+        "id": "b:1222",
+        "name": "R K Puram Sec-5",
+        "lat": 28.563033,
+        "lon": 77.16825
+      },
+      {
+        "id": "b:1221",
+        "name": "Swami Malai Mandir",
+        "lat": 28.568467,
+        "lon": 77.164833
+      },
+      {
+        "id": "b:2625",
+        "name": "R K Puram Sec-8",
+        "lat": 28.5697,
+        "lon": 77.1656
+      },
+      {
+        "id": "b:15012",
+        "name": "RK Puram Sec-7",
+        "lat": 28.57065,
+        "lon": 77.16916
+      },
+      {
+        "id": "b:1056",
+        "name": "Sangam Cinema",
+        "lat": 28.5736,
+        "lon": 77.1737
+      },
+      {
+        "id": "b:1055",
+        "name": "R. K. Puram Sec-12",
+        "lat": 28.5757,
+        "lon": 77.1724
+      },
+      {
+        "id": "b:1054",
+        "name": "South Moti Bagh",
+        "lat": 28.578,
+        "lon": 77.175
+      },
+      {
+        "id": "b:4135",
+        "name": "Moti Bagh 1",
+        "lat": 28.5804,
+        "lon": 77.1802
+      },
+      {
+        "id": "b:4134",
+        "name": "Railway Museum",
+        "lat": 28.5872,
+        "lon": 77.1856
+      },
+      {
+        "id": "b:15823",
+        "name": "German Ambessy",
+        "lat": 28.590508,
+        "lon": 77.18731
+      },
+      {
+        "id": "b:15822",
+        "name": "USSR Embassy",
+        "lat": 28.598283,
+        "lon": 77.191208
+      },
+      {
+        "id": "b:15821",
+        "name": "UK High Commision",
+        "lat": 28.600847,
+        "lon": 77.19256
+      },
+      {
+        "id": "b:2456",
+        "name": "PS Chankya Puri",
+        "lat": 28.603617,
+        "lon": 77.1966
+      },
+      {
+        "id": "b:2455",
+        "name": "Teen Murti",
+        "lat": 28.605717,
+        "lon": 77.199067
+      },
+      {
+        "id": "b:2454",
+        "name": "South Enclave",
+        "lat": 28.610317,
+        "lon": 77.199317
+      },
+      {
+        "id": "b:2453",
+        "name": "Tyag Raj Marg",
+        "lat": 28.608983,
+        "lon": 77.203067
+      },
+      {
+        "id": "b:2452",
+        "name": "Sena Bhawan",
+        "lat": 28.60815,
+        "lon": 77.206667
+      },
+      {
+        "id": "b:836",
+        "name": "Sunehri Masjid/ G Block",
+        "lat": 28.6094,
+        "lon": 77.2097
+      },
+      {
+        "id": "b:16633",
+        "name": "Udyog Bhawan",
+        "lat": 28.6126,
+        "lon": 77.2122
+      },
+      {
+        "id": "b:1673",
+        "name": "Krishi Bhawan",
+        "lat": 28.617467,
+        "lon": 77.213083
+      },
+      {
+        "id": "b:833",
+        "name": "Aakashwani Bhawan",
+        "lat": 28.62045,
+        "lon": 77.212633
+      },
+      {
+        "id": "b:832",
+        "name": "P S Parliament / Jantar Mantar",
+        "lat": 28.625448,
+        "lon": 77.214345
+      },
+      {
+        "id": "b:15353",
+        "name": "Regal",
+        "lat": 28.628636,
+        "lon": 77.216583
+      }
+    ]
+  },
+  {
+    "id": "bus:511U",
+    "number": "511U",
+    "name": "Munirka Village (T) - Nehru Place Crossing / Paras Cinema",
+    "color": "#2563eb",
+    "speedKmh": 16,
+    "cycleMinutes": 81,
+    "vehicles": 5,
+    "gtfsRouteId": "5203",
+    "gtfsLongName": "511UP",
+    "corridorKm": 9.49,
+    "stops": [
+      {
+        "id": "b:2973",
+        "name": "Munirka Village (T)",
+        "lat": 28.558934,
+        "lon": 77.173829
+      },
+      {
+        "id": "b:15679",
+        "name": "DDA FLATS MUNIRKA",
+        "lat": 28.554234,
+        "lon": 77.177131
+      },
+      {
+        "id": "b:2402",
+        "name": "Ber Sarai",
+        "lat": 28.549533,
+        "lon": 77.180433
+      },
+      {
+        "id": "b:2401",
+        "name": "School Of Physical Science",
+        "lat": 28.546433,
+        "lon": 77.17925
+      },
+      {
+        "id": "b:2400",
+        "name": "FAI",
+        "lat": 28.543617,
+        "lon": 77.179833
+      },
+      {
+        "id": "b:2399",
+        "name": "Sanskrit Vidyapeeth",
+        "lat": 28.542017,
+        "lon": 77.182467
+      },
+      {
+        "id": "b:2398",
+        "name": "Katwaria Sarai",
+        "lat": 28.540444,
+        "lon": 77.184993
+      },
+      {
+        "id": "b:2397",
+        "name": "Qutub Hotel",
+        "lat": 28.539133,
+        "lon": 77.189533
+      },
+      {
+        "id": "b:2396",
+        "name": "NCERT",
+        "lat": 28.538017,
+        "lon": 77.19275
+      },
+      {
+        "id": "b:4260",
+        "name": "Adhchini Village",
+        "lat": 28.537676,
+        "lon": 77.198299
+      },
+      {
+        "id": "b:4259",
+        "name": "Mothers International School",
+        "lat": 28.54002,
+        "lon": 77.19939
+      },
+      {
+        "id": "b:4258",
+        "name": "IIT Gate",
+        "lat": 28.542778,
+        "lon": 77.200665
+      },
+      {
+        "id": "b:1809",
+        "name": "Panchsheel Club (Sarv Priya Vihar)",
+        "lat": 28.543659,
+        "lon": 77.204978
+      },
+      {
+        "id": "b:1807",
+        "name": "Sadhna Enclave",
+        "lat": 28.5429,
+        "lon": 77.2149
+      },
+      {
+        "id": "b:1805",
+        "name": "Swami Nagar",
+        "lat": 28.54215,
+        "lon": 77.224683
+      },
+      {
+        "id": "b:2781",
+        "name": "Chirag Dilli",
+        "lat": 28.5415,
+        "lon": 77.2296
+      },
+      {
+        "id": "b:1804",
+        "name": "OS Communication / Masjid Moth",
+        "lat": 28.54045,
+        "lon": 77.235833
+      },
+      {
+        "id": "b:1803",
+        "name": "Pumposh Enclave",
+        "lat": 28.5435,
+        "lon": 77.2441
+      },
+      {
+        "id": "b:16421",
+        "name": "Nehru Place Crossing / Paras Cinema",
+        "lat": 28.5453,
+        "lon": 77.2505
+      }
+    ]
+  },
+  {
+    "id": "bus:623B",
+    "number": "623B",
+    "name": "Munirka Village (T) - AIIMS Ring Road",
+    "color": "#2563eb",
+    "speedKmh": 16,
+    "cycleMinutes": 49,
+    "vehicles": 3,
+    "gtfsRouteId": "5723",
+    "gtfsLongName": "623BDOWN",
+    "corridorKm": 5.21,
+    "stops": [
+      {
+        "id": "b:2973",
+        "name": "Munirka Village (T)",
+        "lat": 28.558934,
+        "lon": 77.173829
+      },
+      {
+        "id": "b:3603",
+        "name": "RK Puram Sec-1",
+        "lat": 28.5643,
+        "lon": 77.1798
+      },
+      {
+        "id": "b:2375",
+        "name": "R K Puram Sec-4",
+        "lat": 28.563067,
+        "lon": 77.18
+      },
+      {
+        "id": "b:2376",
+        "name": "R K Puram Sec-3",
+        "lat": 28.55877,
+        "lon": 77.18227
+      },
+      {
+        "id": "b:2378",
+        "name": "R K Puram Sec-2",
+        "lat": 28.561567,
+        "lon": 77.188233
+      },
+      {
+        "id": "b:2379",
+        "name": "Mohammadpur Village",
+        "lat": 28.564883,
+        "lon": 77.188917
+      },
+      {
+        "id": "b:2627",
+        "name": "Bhikaji Cama Place",
+        "lat": 28.568,
+        "lon": 77.1893
+      },
+      {
+        "id": "b:2628",
+        "name": "Africa Avenue",
+        "lat": 28.56965,
+        "lon": 77.19145
+      },
+      {
+        "id": "b:2107",
+        "name": "Nauroji Nagar",
+        "lat": 28.569633,
+        "lon": 77.195533
+      },
+      {
+        "id": "b:2108",
+        "name": "SJ Hospital",
+        "lat": 28.5697,
+        "lon": 77.204383
+      },
+      {
+        "id": "b:1405",
+        "name": "AIIMS Ring Road",
+        "lat": 28.56915,
+        "lon": 77.212433
+      }
+    ]
+  },
+  {
+    "id": "bus:380D",
+    "number": "380D",
+    "name": "ISBT Kashmere Gate (Lothian Road) - Palika Kendra",
+    "color": "#2563eb",
+    "speedKmh": 16,
+    "cycleMinutes": 57,
+    "vehicles": 3,
+    "gtfsRouteId": "321",
+    "gtfsLongName": "380DOWN",
+    "corridorKm": 6.3,
+    "stops": [
+      {
+        "id": "b:108",
+        "name": "ISBT Kashmere Gate (Lothian Road)",
+        "lat": 28.66685,
+        "lon": 77.229517
+      },
+      {
+        "id": "b:109",
+        "name": "Guru Govind Singh University (Kashmere Gate)",
+        "lat": 28.6657,
+        "lon": 77.23
+      },
+      {
+        "id": "b:110",
+        "name": "GPO",
+        "lat": 28.661717,
+        "lon": 77.2354
+      },
+      {
+        "id": "b:957",
+        "name": "Red Fort",
+        "lat": 28.6577,
+        "lon": 77.2371
+      },
+      {
+        "id": "b:958",
+        "name": "Jama Masjid",
+        "lat": 28.650817,
+        "lon": 77.238467
+      },
+      {
+        "id": "b:959",
+        "name": "Darya Ganj",
+        "lat": 28.646083,
+        "lon": 77.2404
+      },
+      {
+        "id": "b:960",
+        "name": "Delhi Gate (JLN Marg)",
+        "lat": 28.640024,
+        "lon": 77.238077
+      },
+      {
+        "id": "b:961",
+        "name": "LNJP Hospital",
+        "lat": 28.6401,
+        "lon": 77.234817
+      },
+      {
+        "id": "b:962",
+        "name": "Zakir Husain College",
+        "lat": 28.64115,
+        "lon": 77.229617
+      },
+      {
+        "id": "b:964",
+        "name": "Vivekanand Marg / Minto Road",
+        "lat": 28.640867,
+        "lon": 77.225733
+      },
+      {
+        "id": "b:829",
+        "name": "Shivaji Park",
+        "lat": 28.638735,
+        "lon": 77.224176
+      },
+      {
+        "id": "b:830",
+        "name": "Super Bazar",
+        "lat": 28.632583,
+        "lon": 77.22305
+      },
+      {
+        "id": "b:831",
+        "name": "Palika Kendra",
+        "lat": 28.628567,
+        "lon": 77.216783
+      }
+    ]
+  }
+]

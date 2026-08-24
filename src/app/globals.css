@@ -1,0 +1,31 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+    "Noto Sans", "Noto Sans Devanagari", sans-serif;
+  --color-saffron: #ff9933;
+  --color-indiagreen: #138808;
+}
+
+html,
+body {
+  min-height: 100%;
+}
+
+/* MapLibre popup styling to match the design system */
+.maplibregl-popup-content {
+  border-radius: 0.75rem !important;
+  padding: 0.5rem 0.75rem !important;
+  font-size: 0.8125rem;
+  box-shadow: 0 4px 16px rgb(15 23 42 / 0.18) !important;
+}
+.maplibregl-popup-tip {
+  border-width: 6px !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tb-animate {
+    transition: none !important;
+    animation: none !important;
+  }
+}

@@ -1,0 +1,131 @@
+{
+  "generatedAtUtc": "2026-08-24T01:35:34.363Z",
+  "sources": {
+    "bus": "Official Delhi OTD GTFS snapshot (Feb 2023 vintage) via MobilityData mirror mdb-1262 (files.mobilitydatabase.org), sha256-matched to mdb-3139.",
+    "metro": "DMRC GTFS snapshot via community mirror (byte-compatible twin verified against official counts where published).",
+    "notice": "Raw feeds are NOT redistributed by this repository. Generated subsets under src/data/generated are derivative, heavily reduced prototype networks."
+  },
+  "bboxFilter": {
+    "minLat": 28.4,
+    "maxLat": 28.9,
+    "minLon": 76.9,
+    "maxLon": 77.55
+  },
+  "bus": {
+    "stopsTotal": null,
+    "anchorMatches": {
+      "munirka": 2,
+      "cp": 9,
+      "nehruPlace": 11,
+      "hauzKhas": 5,
+      "aiims": 5,
+      "kashmereGate": 8,
+      "iit": 11,
+      "indiaGate": 1,
+      "shivajiStadium": 5
+    },
+    "corridor_munirka-cp": {
+      "number": "620U",
+      "gtfsRouteId": "5252",
+      "longName": "620UP",
+      "stops": 25,
+      "km": 11.05
+    },
+    "corridor_munirka-nehruPlace": {
+      "number": "511U",
+      "gtfsRouteId": "5203",
+      "longName": "511UP",
+      "stops": 19,
+      "km": 9.49
+    },
+    "corridor_munirka-aiims": {
+      "number": "623B",
+      "gtfsRouteId": "5723",
+      "longName": "623BDOWN",
+      "stops": 11,
+      "km": 5.21
+    },
+    "corridor_kashmereGate-cp": {
+      "number": "380D",
+      "gtfsRouteId": "321",
+      "longName": "380DOWN",
+      "stops": 13,
+      "km": 6.3
+    },
+    "calendar": {
+      "start": "20220101",
+      "end": "20240101"
+    }
+  },
+  "metro": {
+    "AQUA": {
+      "stations": 13,
+      "gtfsRouteId": "17",
+      "termini": "Noida Sector 142 - Depot Station",
+      "tripsInFeed": 224
+    },
+    "BLUE": {
+      "stations": 50,
+      "gtfsRouteId": "5",
+      "termini": "Dwarka Sector - 21 - Noida Electronic City",
+      "tripsInFeed": 179
+    },
+    "GREEN": {
+      "stations": 22,
+      "gtfsRouteId": "7",
+      "termini": "Kirti Nagar - Brigadier Hoshiyar Singh",
+      "tripsInFeed": 108
+    },
+    "MAGENTA": {
+      "stations": 25,
+      "gtfsRouteId": "12",
+      "termini": "Janak Puri West - Botanical Garden",
+      "tripsInFeed": 178
+    },
+    "ORANGE": {
+      "stations": 6,
+      "gtfsRouteId": "14",
+      "termini": "Dwarka Sector - 21 - New Delhi",
+      "tripsInFeed": 112
+    },
+    "PINK": {
+      "stations": 38,
+      "gtfsRouteId": "11",
+      "termini": "Majlis Park - Shiv Vihar",
+      "tripsInFeed": 182
+    },
+    "RAPID": {
+      "stations": 12,
+      "gtfsRouteId": "15",
+      "termini": "Sector 55-56 (Rapid Metro) - Phase 3 (Rapid Metro)",
+      "tripsInFeed": 196
+    },
+    "RED": {
+      "stations": 29,
+      "gtfsRouteId": "1",
+      "termini": "Rithala - Shaheed Sthal (New Bus Adda)",
+      "tripsInFeed": 159
+    },
+    "VIOLET": {
+      "stations": 30,
+      "gtfsRouteId": "10",
+      "termini": "Kashmere Gate - Neelam Chowk Ajronda",
+      "tripsInFeed": 134
+    },
+    "YELLOW": {
+      "stations": 37,
+      "gtfsRouteId": "2",
+      "termini": "Huda City Centre - Samaypur Badli",
+      "tripsInFeed": 60
+    },
+    "calendar": {
+      "start": "20190101",
+      "end": "20251231"
+    }
+  },
+  "warnings": [
+    "Metro color GRAY: fewer than 5 stations inside Delhi bbox after filtering - skipped.",
+    "No bus corridor found for nehruPlace -> cp.",
+    "Corridor iit-nehruPlace reuses route 5203; skipped."
+  ]
+}
