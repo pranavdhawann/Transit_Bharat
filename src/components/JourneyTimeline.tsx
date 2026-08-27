@@ -88,7 +88,7 @@ export default function JourneyTimeline({ journey }: { journey: Journey }) {
                     <>
                       {modeLabel(leg.mode)}{" "}
                       {(leg.routeNumber || leg.routeName) && (
-                        <span style={{ color: leg.routeColor ?? THEMES.light.ink3 }}>
+                        <span className="text-ink-2">
                           {[leg.routeNumber, leg.routeName]
                             .filter(Boolean)
                             .join(" · ")}
