@@ -2,7 +2,7 @@
   {
     "id": "metro:orange",
     "name": "Airport Express",
-    "color": "#fb8c00",
+    "color": "#E06A16",
     "speedKmh": 42,
     "gtfsRouteId": "14",
     "stations": [
@@ -47,7 +47,7 @@
   {
     "id": "metro:aqua",
     "name": "Aqua Line (Noida)",
-    "color": "#00acc1",
+    "color": "#087483",
     "speedKmh": 33,
     "gtfsRouteId": "17",
     "stations": [
@@ -134,7 +134,7 @@
   {
     "id": "metro:blue",
     "name": "Blue Line",
-    "color": "#1e88e5",
+    "color": "#0B57A4",
     "speedKmh": 33,
     "gtfsRouteId": "5",
     "stations": [
@@ -443,7 +443,7 @@
   {
     "id": "metro:green",
     "name": "Green Line",
-    "color": "#2e7d32",
+    "color": "#1B793D",
     "speedKmh": 33,
     "gtfsRouteId": "7",
     "stations": [
@@ -584,7 +584,7 @@
   {
     "id": "metro:magenta",
     "name": "Magenta Line",
-    "color": "#c2185b",
+    "color": "#A8206B",
     "speedKmh": 33,
     "gtfsRouteId": "12",
     "stations": [
@@ -743,7 +743,7 @@
   {
     "id": "metro:pink",
     "name": "Pink Line",
-    "color": "#ec6aa8",
+    "color": "#D65E92",
     "speedKmh": 33,
     "gtfsRouteId": "11",
     "stations": [
@@ -980,7 +980,7 @@
   {
     "id": "metro:rapid",
     "name": "Rapid Metro (Gurugram)",
-    "color": "#8d6e63",
+    "color": "#7F6359",
     "speedKmh": 33,
     "gtfsRouteId": "15",
     "stations": [
@@ -1061,7 +1061,7 @@
   {
     "id": "metro:red",
     "name": "Red Line",
-    "color": "#e53935",
+    "color": "#C43129",
     "speedKmh": 33,
     "gtfsRouteId": "1",
     "stations": [
@@ -1244,7 +1244,7 @@
   {
     "id": "metro:violet",
     "name": "Violet Line",
-    "color": "#6a1b9a",
+    "color": "#5B2A86",
     "speedKmh": 33,
     "gtfsRouteId": "10",
     "stations": [
@@ -1433,7 +1433,7 @@
   {
     "id": "metro:yellow",
     "name": "Yellow Line",
-    "color": "#f0c400",
+    "color": "#E8B300",
     "speedKmh": 33,
     "gtfsRouteId": "2",
     "stations": [

@@ -10,6 +10,7 @@
  */
 import metroLinesJson from "./generated/metro-lines.json";
 import busCorridorsJson from "./generated/bus-corridors.json";
+import { BUS_BASES } from "@/lib/route-palette";
 
 export interface NetworkStop {
   id: string;
@@ -90,7 +91,7 @@ function isStopArray(v: unknown): v is NetworkStop[] {
   );
 }
 
-const BUS_PALETTE = ["#2563eb", "#0d9488", "#b45309", "#7c3aed", "#be185d"];
+const BUS_PALETTE = BUS_BASES.map((p) => p.light);
 
 function loadMetroLines(): MetroLine[] {
   if (!Array.isArray(metroLinesJson) || metroLinesJson.length === 0) {
@@ -104,7 +105,7 @@ function loadMetroLines(): MetroLine[] {
       id: typeof raw.id === "string" ? raw.id : name.toLowerCase().replace(/\s+/g, "-"),
       name,
       shortName: name.replace(/\s*Line.*$/u, "").trim() || name,
-      color: typeof raw.color === "string" ? raw.color : "#607d8b",
+      color: typeof raw.color === "string" ? raw.color : BUS_BASES[0].light,
       speedKmh: typeof raw.speedKmh === "number" ? raw.speedKmh : 33,
       stations: raw.stations,
     });

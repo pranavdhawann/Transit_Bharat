@@ -161,17 +161,17 @@ async function ingestMetro() {
   });
 
   const COLOR_HEX = {
-    RED: "#e53935",
-    YELLOW: "#f0c400",
-    BLUE: "#1e88e5",
-    GREEN: "#2e7d32",
-    VIOLET: "#6a1b9a",
-    PINK: "#ec6aa8",
-    MAGENTA: "#c2185b",
-    ORANGE: "#fb8c00",
+    RED: "#C43129",
+    YELLOW: "#E8B300",
+    BLUE: "#0B57A4",
+    GREEN: "#1B793D",
+    VIOLET: "#5B2A86",
+    PINK: "#D65E92",
+    MAGENTA: "#A8206B",
+    ORANGE: "#E06A16",
     GRAY: "#8d8d8d",
-    AQUA: "#00acc1",
-    RAPID: "#8d6e63",
+    AQUA: "#087483",
+    RAPID: "#7F6359",
   };
   const SPEED_KMH = { ORANGE: 42 };
   const LABEL = {
