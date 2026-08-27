@@ -45,7 +45,7 @@ export default function RootLayout({
       <body className="bg-paper type-body text-ink antialiased flex min-h-screen flex-col">
         <div aria-hidden className="h-[3px] bg-saffron" />
         <header className="border-b border-rule bg-surface">
-          <div className="mx-auto flex h-12 max-w-6xl items-center justify-between px-4">
+          <div className="mx-auto flex h-12 max-w-6xl items-center justify-between gap-3 px-4">
             <Link href="/" className="focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-saffron">
               <Wordmark />
             </Link>
