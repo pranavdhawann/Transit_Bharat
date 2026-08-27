@@ -2,7 +2,7 @@ import Link from "next/link";
 import { BUS_ROUTES, METRO_LINES, allStops } from "@/data/network";
 
 export const metadata = {
-  title: "How Transit Bharat is built",
+  title: "How BharaTransit is built",
 };
 
 export default function AboutPage() {
@@ -17,7 +17,7 @@ export default function AboutPage() {
     <div className="mx-auto max-w-3xl space-y-8">
       <p className="text-sm">
         <Link href="/" className="font-medium text-blue-600 hover:underline">
-          &larr; Back to Transit Bharat
+          &larr; Back to BharaTransit
         </Link>
       </p>
 
@@ -93,9 +93,9 @@ export default function AboutPage() {
         <h2 id="arch" className="text-lg font-semibold tracking-tight">
           Architecture
         </h2>
-        <pre className="mt-3 overflow-x-auto rounded-xl border border-slate-200 bg-slate-900 p-4 text-xs leading-relaxed text-slate-100">{`Transit Bharat PWA (Next.js 15 · TypeScript · Tailwind · MapLibre)
+        <pre className="mt-3 overflow-x-auto rounded-xl border border-slate-200 bg-slate-900 p-4 text-xs leading-relaxed text-slate-100">{`BharaTransit PWA (Next.js 15 · TypeScript · Tailwind · MapLibre)
         │
-Transit Bharat API (normalized schema - frontend never sees raw feeds)
+BharaTransit API (normalized schema - frontend never sees raw feeds)
  ├─ GET  /api/places              place index: real stops + landmarks, fuzzy
  ├─ POST /api/journeys            deterministic multimodal planner  ← OTP slot
  ├─ GET  /api/vehicles            synthetic vehicle positions (DEMO)

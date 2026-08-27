@@ -33,7 +33,7 @@ export default function GoClient() {
     (async () => {
       // Prefer the journey handed over from the plan page.
       try {
-        const raw = sessionStorage.getItem("tb:journey");
+        const raw = sessionStorage.getItem("bt:journey");
         if (raw) {
           const j = JSON.parse(raw) as Journey;
           if (!cancelled && j?.legs?.length) {
@@ -353,7 +353,7 @@ function GoNavigator({ initialJourney }: { initialJourney: Journey }) {
             )}
             <div className="mt-4 h-2 overflow-hidden rounded-full bg-white/15">
               <div
-                className="tb-animate h-full rounded-full bg-emerald-400"
+                className="bt-animate h-full rounded-full bg-emerald-400"
                 style={{ width: `${arrived ? 100 : overallProgress}%` }}
               />
             </div>
@@ -399,7 +399,7 @@ function GoNavigator({ initialJourney }: { initialJourney: Journey }) {
               <>
                 <Link
                   href="/"
-                  onClick={() => sessionStorage.removeItem("tb:journey")}
+                  onClick={() => sessionStorage.removeItem("bt:journey")}
                   className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
                 >
                   Plan another journey

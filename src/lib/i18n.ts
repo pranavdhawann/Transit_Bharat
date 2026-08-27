@@ -4,8 +4,8 @@ import { useCallback, useEffect, useState } from "react";
 
 export type Lang = "en" | "hi";
 
-const STORAGE_KEY = "tb:lang";
-const EVENT = "tb:lang-change";
+const STORAGE_KEY = "bt:lang";
+const EVENT = "bt:lang-change";
 
 /**
  * Lightweight bilingual toggle (EN / हिंदी) for key journey strings.

@@ -13,7 +13,7 @@ import type { ScenarioState } from "./types";
  * sessionStorage (not localStorage) so the scenario dies with the tab and a
  * judge opening a fresh tab always starts from a clean, undelayed network.
  */
-const KEY = "tb:scenario";
+const KEY = "bt:scenario";
 
 export function loadScenario(): ScenarioState | null {
   if (typeof window === "undefined") return null;

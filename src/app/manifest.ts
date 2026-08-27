@@ -2,8 +2,8 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Transit Bharat - Delhi pilot",
-    short_name: "Transit Bharat",
+    name: "BharaTransit - Delhi pilot",
+    short_name: "BharaTransit",
     description:
       "A trustworthy navigation layer for Indian public transport. Door-to-door bus + metro journeys with honest data provenance.",
     start_url: "/",

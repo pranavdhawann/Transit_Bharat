@@ -163,7 +163,7 @@ export default function PlanClient() {
   function startGo() {
     if (!selected) return;
     try {
-      sessionStorage.setItem("tb:journey", JSON.stringify(selected));
+      sessionStorage.setItem("bt:journey", JSON.stringify(selected));
     } catch {
       // GO page falls back to re-planning via URL params.
     }

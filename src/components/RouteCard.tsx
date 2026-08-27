@@ -27,7 +27,7 @@ export default function RouteCard({
       type="button"
       onClick={() => onSelect(journey.id)}
       aria-pressed={selected}
-      className={`tb-animate block w-full rounded-2xl border bg-white p-4 text-left shadow-sm transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 ${
+      className={`bt-animate block w-full rounded-2xl border bg-white p-4 text-left shadow-sm transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 ${
         selected
           ? "border-blue-600 ring-2 ring-blue-100"
           : "border-slate-200 hover:border-slate-300 hover:shadow"

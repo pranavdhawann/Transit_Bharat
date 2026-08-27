@@ -1,4 +1,4 @@
-# Deploying Transit Bharat to Netlify
+# Deploying BharaTransit to Netlify
 
 Target: a public URL that opens in incognito without requesting access, which
 is a hackathon non-negotiable. Budget ~30 minutes including the smoke test.
@@ -66,7 +66,7 @@ Never commit the key. `.env` and `.env*.local` are already gitignored.
 
 **Site configuration → General → Site details → Change site name.**
 
-Something like `transit-bharat` gives you `https://transit-bharat.netlify.app`,
+Something like `bharatransit` gives you `https://bharatransit.netlify.app`,
 which reads far better in a submission form and on video than the generated
 `spontaneous-tapioca-1a2b3c.netlify.app`.
 
@@ -105,7 +105,7 @@ to do nothing on roughly every other request. It is now carried by the client.
 Netlify gives every deploy its own permalink and only moves the main site URL
 when a build succeeds, so a broken push cannot take the demo down. Still:
 
-- Submit the **site URL** (`transit-bharat.netlify.app`), not a deploy
+- Submit the **site URL** (`bharatransit.netlify.app`), not a deploy
   permalink — permalinks look like a build artefact to a judge.
 - Once you have recorded the video, stop pushing to `master`. If you must keep
   working, branch, and let Netlify build deploy previews instead.

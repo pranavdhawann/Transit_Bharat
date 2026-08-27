@@ -1,6 +1,6 @@
 # BUILD_WITH_CODEX.md
 
-How coding-agent assistance was used to build Transit Bharat.
+How coding-agent assistance was used to build BharaTransit.
 
 **Tooling truth:** this repository was built in a single working session on
 23 Aug 2026 using the **opencode CLI coding agent** (Codex-style terminal

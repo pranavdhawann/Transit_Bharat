@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Transit Bharat - GTFS ingestion, validation & network generation.
+ * BharaTransit - GTFS ingestion, validation & network generation.
  *
  * Reads the official Delhi Open Transit Data GTFS-style snapshots (downloaded
  * from the MobilityData mirror of the official feed - see LIMITATIONS.md),

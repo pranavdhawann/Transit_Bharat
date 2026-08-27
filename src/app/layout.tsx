@@ -3,7 +3,7 @@ import Link from "next/link";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Transit Bharat — Delhi pilot",
+  title: "BharaTransit — Delhi pilot",
   description:
     "A trustworthy navigation layer for Indian public transport. Plan a door-to-door bus and metro journey, see where your bus is, know how fresh the information is.",
 };
@@ -27,7 +27,7 @@ export default function RootLayout({
                 TB
               </span>
               <span className="text-lg font-semibold tracking-tight">
-                Transit <span className="text-orange-600">Bharat</span>
+                BharaTransit
               </span>
             </Link>
             <p className="hidden text-xs text-slate-500 sm:block">

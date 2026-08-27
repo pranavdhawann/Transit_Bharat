@@ -15,7 +15,7 @@ Paste this into the summary field as-is.
 > times are shown with identical confidence whether they come from live GPS, a
 > timetable, or a stale cache.
 >
-> Transit Bharat plans complete bus + metro + walk journeys on a network built
+> BharaTransit plans complete bus + metro + walk journeys on a network built
 > from official Delhi Open Transit Data GTFS snapshots and DMRC lines. Search
 > any stop, station or landmark — in English or Hindi — and get up to three
 > labelled options with fares, transfers and walking distance. GO mode guides
@@ -49,7 +49,7 @@ rejects it, cut the final paragraph first (it costs 21 words).
 | Partner email | Registered email, or blank if solo | ☐ |
 | Same email everywhere | Used at registration and submission | ☐ |
 
-Mock login credentials: **not applicable** — Transit Bharat needs no account.
+Mock login credentials: **not applicable** — BharaTransit needs no account.
 Say exactly that in the field rather than leaving it blank.
 
 ---

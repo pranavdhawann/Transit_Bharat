@@ -1,8 +1,8 @@
 {
-  "name": "transit-bharat",
+  "name": "bharatransit",
   "version": "0.1.0",
   "private": true,
-  "description": "Transit Bharat - a trustworthy navigation layer for Indian public transport. Delhi pilot hackathon prototype.",
+  "description": "BharaTransit - a trustworthy navigation layer for Indian public transport. Delhi pilot hackathon prototype.",
   "scripts": {
     "dev": "next dev",
     "build": "next build",

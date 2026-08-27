@@ -1,4 +1,4 @@
-# Transit Bharat — Delhi Pilot
+# BharaTransit — Delhi Pilot
 
 **Know exactly how to get there, and how much to trust what you're told.**
 
