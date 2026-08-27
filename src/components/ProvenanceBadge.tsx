@@ -16,14 +16,14 @@ export default function ProvenanceBadge({
   return (
     <span
       title={title ?? meta.hint}
-      className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide ${meta.className} ${className}`}
+      className={`type-micro inline-flex items-center gap-1.5 rounded-[2px] border px-1.5 py-0.5 ${meta.className} ${className}`}
     >
       <span
         aria-hidden
         className={`h-1.5 w-1.5 rounded-full ${meta.dotClassName}`}
       />
       {meta.label}
-      {suffix ? <span className="font-medium normal-case">· {suffix}</span> : null}
+      {suffix ? <span className="lowercase tracking-normal">· {suffix}</span> : null}
     </span>
   );
 }

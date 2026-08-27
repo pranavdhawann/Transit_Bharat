@@ -29,9 +29,13 @@ export function provenance(
   return "STALE";
 }
 
+export type ProvenanceForm = "filled" | "outline" | "hollow" | "hatched";
+
 export interface ProvenanceMeta {
   label: string;
   hint: string;
+  /** Non-colour distinguisher. Spec section 3.2 — a hard accessibility requirement. */
+  form: ProvenanceForm;
   className: string;
   dotClassName: string;
 }
@@ -40,25 +44,29 @@ export const PROVENANCE_META: Record<Provenance, ProvenanceMeta> = {
   LIVE: {
     label: "LIVE",
     hint: "Fresh realtime vehicle data",
-    className: "bg-emerald-50 text-emerald-800 border-emerald-200",
-    dotClassName: "bg-emerald-500",
+    form: "filled",
+    className: "border-live bg-live text-paper",
+    dotClassName: "bg-paper bt-animate animate-pulse",
   },
   SCHEDULED: {
     label: "SCHEDULED",
     hint: "Timetable only - no live vehicle data available",
-    className: "bg-amber-50 text-amber-800 border-amber-200",
-    dotClassName: "bg-amber-500",
+    form: "outline",
+    className: "border-ink-2 text-ink-2",
+    dotClassName: "border border-ink-2 bg-transparent",
   },
   STALE: {
     label: "STALE",
     hint: "Last live update is too old to trust fully",
-    className: "bg-orange-50 text-orange-800 border-orange-200",
-    dotClassName: "bg-orange-500",
+    form: "hollow",
+    className: "border-stale text-stale",
+    dotClassName: "border-2 border-stale bg-transparent",
   },
   DEMO: {
     label: "DEMO",
     hint: "Synthetic hackathon data - not real vehicle positions",
-    className: "bg-violet-50 text-violet-800 border-violet-200",
-    dotClassName: "bg-violet-500",
+    form: "hatched",
+    className: "border-ink-2 text-ink-2 hatch",
+    dotClassName: "border border-ink-2 bg-transparent",
   },
 };
