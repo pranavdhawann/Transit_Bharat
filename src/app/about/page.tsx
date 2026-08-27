@@ -16,23 +16,26 @@ export default function AboutPage() {
   return (
     <div className="mx-auto max-w-3xl space-y-8">
       <p className="text-sm">
-        <Link href="/" className="font-medium text-blue-600 hover:underline">
+        <Link
+          href="/"
+          className="font-medium text-ink underline hover:text-ink-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-saffron"
+        >
           &larr; Back to BharaTransit
         </Link>
       </p>
 
       <section>
-        <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
+        <h1 className="type-display text-3xl sm:text-4xl">
           How this is built
         </h1>
-        <p className="mt-2 text-slate-600">
+        <p className="mt-2 text-ink-2">
           Standards-based transit architecture on open data - not hard-coded
           screens. Everything below is running code in this repository.
         </p>
       </section>
 
       <section aria-labelledby="stats" className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <h2 id="stats" className="sr-only">
+        <h2 id="stats" className="type-micro border-b border-rule pb-1 text-ink-3 sr-only">
           Network statistics
         </h2>
         {[
@@ -43,22 +46,22 @@ export default function AboutPage() {
         ].map(([n, label]) => (
           <div
             key={label}
-            className="rounded-xl border border-slate-200 bg-white p-3 text-center shadow-sm"
+            className="border border-rule bg-surface p-3 text-center"
           >
-            <p className="text-2xl font-bold text-slate-900">{n}</p>
-            <p className="text-xs text-slate-500">{label}</p>
+            <p className="type-data text-3xl text-ink">{n}</p>
+            <p className="text-xs text-ink-2">{label}</p>
           </div>
         ))}
       </section>
 
       <section aria-labelledby="pipeline">
-        <h2 id="pipeline" className="text-lg font-semibold tracking-tight">
+        <h2 id="pipeline" className="type-micro border-b border-rule pb-1 text-ink-3">
           Data pipeline (end-to-end)
         </h2>
-        <ol className="mt-3 space-y-2 text-sm text-slate-700">
+        <ol className="mt-3 space-y-2 text-sm text-ink-2">
           <li>
             <strong>1 · Ingest.</strong>{" "}
-            <code className="rounded bg-slate-100 px-1">scripts/ingest-gtfs.mjs</code>{" "}
+            <code className="rounded bg-paper border border-rule px-1">scripts/ingest-gtfs.mjs</code>{" "}
             streams the official Delhi Open Transit Data GTFS snapshots
             (6,342 DTC stops / 78,515 trips / DMRC lines), validates columns,
             coordinate bounds and calendars.
@@ -90,10 +93,10 @@ export default function AboutPage() {
       </section>
 
       <section aria-labelledby="arch">
-        <h2 id="arch" className="text-lg font-semibold tracking-tight">
+        <h2 id="arch" className="type-micro border-b border-rule pb-1 text-ink-3">
           Architecture
         </h2>
-        <pre className="mt-3 overflow-x-auto rounded-xl border border-slate-200 bg-slate-900 p-4 text-xs leading-relaxed text-slate-100">{`BharaTransit PWA (Next.js 15 · TypeScript · Tailwind · MapLibre)
+        <pre className="mt-3 overflow-x-auto border border-rule bg-ink p-4 text-xs leading-relaxed text-paper">{`BharaTransit PWA (Next.js 15 · TypeScript · Tailwind · MapLibre)
         │
 BharaTransit API (normalized schema - frontend never sees raw feeds)
  ├─ GET  /api/places              place index: real stops + landmarks, fuzzy
@@ -107,10 +110,10 @@ BharaTransit API (normalized schema - frontend never sees raw feeds)
       </section>
 
       <section aria-labelledby="trust">
-        <h2 id="trust" className="text-lg font-semibold tracking-tight">
+        <h2 id="trust" className="type-micro border-b border-rule pb-1 text-ink-3">
           The trust model
         </h2>
-        <p className="mt-2 text-sm text-slate-600">
+        <p className="mt-2 text-sm text-ink-2">
           Every realtime-looking datum carries exactly one provenance state:
           {" "}<strong>LIVE</strong> (fresh approved feed),{" "}
           <strong>SCHEDULED</strong> (timetable only),{" "}
@@ -123,10 +126,10 @@ BharaTransit API (normalized schema - frontend never sees raw feeds)
       </section>
 
       <section aria-labelledby="ai">
-        <h2 id="ai" className="text-lg font-semibold tracking-tight">
+        <h2 id="ai" className="type-micro border-b border-rule pb-1 text-ink-3">
           Where AI sits (and where it must not)
         </h2>
-        <p className="mt-2 text-sm text-slate-600">
+        <p className="mt-2 text-sm text-ink-2">
           An optional OpenAI model parses plain-language constraints (&quot;reach
           before 9:30, cannot walk much&quot;) into structured preferences via
           strict schema output. Without a key, a transparent heuristic parser is
@@ -136,10 +139,10 @@ BharaTransit API (normalized schema - frontend never sees raw feeds)
       </section>
 
       <section aria-labelledby="honesty">
-        <h2 id="honesty" className="text-lg font-semibold tracking-tight">
+        <h2 id="honesty" className="type-micro border-b border-rule pb-1 text-ink-3">
           Honesty
         </h2>
-        <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-slate-600">
+        <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-ink-2">
           <li>Synthetic realtime data, visibly labeled on every view.</li>
           <li>
             Network derived from official snapshots (2023 vintage) - not current
