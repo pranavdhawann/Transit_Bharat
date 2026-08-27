@@ -42,19 +42,6 @@ const SHADOW_EXEMPT = [
 ];
 
 /**
- * RouteBar computes BOTH the light and dark resolution of each segment's
- * colour up front and hands both to the CSS cascade via custom properties
- * (see the file's own doc comment and `.route-seg` in globals.css) — the
- * literal "light"/"dark" arguments are correctly paired with the
- * light/dark CSS variable slot they feed, not a single hardcoded theme
- * reused everywhere (the original bug this rule guards against). A
- * text-pattern rule cannot distinguish that correct pairing from the bug
- * it is meant to catch, so this one file is exempted by name; any other
- * file introducing a literal here is a real regression candidate.
- */
-const THEME_LITERAL_EXEMPT = ["src/components/RouteBar.tsx"];
-
-/**
  * `src/lib/route-palette.ts` and the test files legitimately pass literal
  * "light"/"dark" strings to resolveOnBase/needsKeyline (they are the
  * implementation and its tests, not components rendering per-theme).
@@ -72,13 +59,73 @@ const RULES: { name: string; pattern: RegExp; exempt?: string[]; scope?: RegExp 
   },
   { name: "no gradients", pattern: /(linear|radial)-gradient/, exempt: ["src/app/globals.css"] },
   { name: "no emoji", pattern: /[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/u },
-  {
-    name: "no hardcoded theme literal in resolveOnBase/needsKeyline",
-    pattern: /\b(resolveOnBase|needsKeyline)\(\s*[^,]+,\s*["'](light|dark)["']/,
-    exempt: THEME_LITERAL_EXEMPT,
-    scope: THEME_LITERAL_SCOPE,
-  },
 ];
+
+/**
+ * Pairing-aware theme-literal guard (spec section 7, Ruling 11).
+ *
+ * A flat regex for a literal "light"/"dark" argument cannot tell a
+ * correct dual-resolution call site from the original bug (a single
+ * hardcoded theme reused for both the light and dark CSS slots) — both
+ * shapes contain the literals. Exempting the one file that legitimately
+ * uses this pattern (RouteBar.tsx) made the guard inert: it had zero
+ * remaining call sites to check, so it could never fail.
+ *
+ * Instead this exploits the structural difference between the two shapes,
+ * per function name, independently:
+ *
+ *  (a) Count parity — the number of calls whose second argument is the
+ *      literal "light" must equal the number whose second argument is
+ *      "dark". The bug calls the same theme twice (or more) with no
+ *      opposite-theme counterpart, so parity breaks.
+ *  (b) First-argument disjointness — the set of first-argument source
+ *      expressions used with "light" must be disjoint from the set used
+ *      with "dark". This catches the subtler bug that (a) alone would
+ *      miss: `resolveOnBase(lightBase, "light")` paired with
+ *      `resolveOnBase(lightBase, "dark")` has perfect count parity but
+ *      still feeds the light base into the dark slot.
+ *
+ * First arguments are compared as trimmed source text (e.g. "lightBase"
+ * vs "darkBase") — this is a static, non-evaluating comparison of
+ * identifiers, not a value comparison.
+ */
+type ThemeCall = { arg: string; theme: "light" | "dark" };
+
+function extractThemeCalls(content: string, fnName: string): ThemeCall[] {
+  const re = new RegExp(
+    `\\b${fnName}\\(\\s*([^,]+?)\\s*,\\s*["'](light|dark)["']`,
+    "g",
+  );
+  const calls: ThemeCall[] = [];
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(content))) {
+    calls.push({ arg: m[1].trim(), theme: m[2] as "light" | "dark" });
+  }
+  return calls;
+}
+
+/** Returns a violation message, or null if the calls are correctly paired. */
+function pairingViolation(content: string, fnName: string): string | null {
+  const calls = extractThemeCalls(content, fnName);
+  if (calls.length === 0) return null;
+
+  const lightArgs = calls.filter((c) => c.theme === "light").map((c) => c.arg);
+  const darkArgs = calls.filter((c) => c.theme === "dark").map((c) => c.arg);
+
+  if (lightArgs.length !== darkArgs.length) {
+    return `${fnName}: light/dark call count mismatch (${lightArgs.length} light vs ${darkArgs.length} dark)`;
+  }
+
+  const darkSet = new Set(darkArgs);
+  const overlap = [...new Set(lightArgs)].filter((a) => darkSet.has(a));
+  if (overlap.length > 0) {
+    return `${fnName}: same first argument (${overlap.join(", ")}) used for both "light" and "dark"`;
+  }
+
+  return null;
+}
+
+const THEME_PAIRED_FNS = ["resolveOnBase", "needsKeyline"] as const;
 
 function walk(dir: string, out: string[] = []): string[] {
   for (const entry of readdirSync(dir)) {
@@ -101,6 +148,66 @@ describe.each(RULES)("design rule: $name", ({ pattern, exempt = [], scope }) => 
         pattern.test(readFileSync(f, "utf8")),
     );
     expect(offenders).toEqual([]);
+  });
+});
+
+describe("design rule: paired theme literals in resolveOnBase/needsKeyline", () => {
+  it("is not violated outside the allowlist", () => {
+    const offenders: string[] = [];
+    for (const f of FILES) {
+      if (ALLOWLIST.includes(f)) continue;
+      if (!THEME_LITERAL_SCOPE.test(f)) continue;
+      const content = readFileSync(f, "utf8");
+      for (const fn of THEME_PAIRED_FNS) {
+        const violation = pairingViolation(content, fn);
+        if (violation) offenders.push(`${f} — ${violation}`);
+      }
+    }
+    expect(offenders).toEqual([]);
+  });
+});
+
+describe("theme-literal pairing rule self-test (falsifiability)", () => {
+  it("fails on the original bug shape: one hardcoded theme, no opposite counterpart", () => {
+    const buggy = `
+      const style = {
+        "--seg-fg": resolveOnBase(base, "light"),
+        "--seg-fg-dark": resolveOnBase(base, "light"),
+        "--seg-keyline": needsKeyline(base, "light") ? INK_KEYLINE : "none",
+        "--seg-keyline-dark": needsKeyline(base, "light") ? INK_KEYLINE : "none",
+      };
+    `;
+    expect(pairingViolation(buggy, "resolveOnBase")).toBe(
+      'resolveOnBase: light/dark call count mismatch (2 light vs 0 dark)',
+    );
+    expect(pairingViolation(buggy, "needsKeyline")).toBe(
+      'needsKeyline: light/dark call count mismatch (2 light vs 0 dark)',
+    );
+  });
+
+  it("fails on the disjointness violation: matched counts but same first argument feeds both slots", () => {
+    const buggy = `
+      const style = {
+        "--seg-fg": resolveOnBase(base, "light"),
+        "--seg-fg-dark": resolveOnBase(base, "dark"),
+      };
+    `;
+    expect(pairingViolation(buggy, "resolveOnBase")).toBe(
+      'resolveOnBase: same first argument (base) used for both "light" and "dark"',
+    );
+  });
+
+  it("passes on the correct paired shape (today's RouteBar.tsx)", () => {
+    const correct = `
+      const style = {
+        "--seg-fg": resolveOnBase(lightBase, "light"),
+        "--seg-fg-dark": resolveOnBase(darkBase, "dark"),
+        "--seg-keyline": needsKeyline(lightBase, "light") ? INK_KEYLINE : "none",
+        "--seg-keyline-dark": needsKeyline(darkBase, "dark") ? INK_KEYLINE : "none",
+      };
+    `;
+    expect(pairingViolation(correct, "resolveOnBase")).toBeNull();
+    expect(pairingViolation(correct, "needsKeyline")).toBeNull();
   });
 });
 
