@@ -384,7 +384,7 @@ export default function MapView({
 
   return (
     <div
-      className={`relative overflow-hidden rounded-[2px] border border-rule ${className}`}
+      className={`relative overflow-hidden border border-rule ${className}`}
     >
       <div
         ref={containerRef}

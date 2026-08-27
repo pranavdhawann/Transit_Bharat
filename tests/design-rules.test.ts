@@ -38,11 +38,19 @@ const SHADOW_EXEMPT = [
  * implementation and its tests, not components rendering per-theme).
  */
 const THEME_LITERAL_SCOPE = /^(src\/components\/|src\/app\/)/;
+// MapView is a map surface rather than a control: its radius must stay zero.
+// Permit only explicit zero-radius utilities; reject every other rounded-* form.
+const MAP_RADIUS_SCOPE = /^src\/components\/MapView\.tsx$/;
 
 const RULES: { name: string; pattern: RegExp; exempt?: string[]; scope?: RegExp }[] = [
   { name: "no shadow utilities", pattern: /\bshadow-(sm|md|lg|xl|2xl|none|\[)/ },
   { name: "no box-shadow in CSS", pattern: /box-shadow\s*:/, exempt: SHADOW_EXEMPT },
   { name: "no large radii", pattern: /\brounded-(lg|xl|2xl|3xl)\b/ },
+  {
+    name: "no nonzero map radius",
+    pattern: /\brounded(?:\b|-(?!none\b|0\b))/,
+    scope: MAP_RADIUS_SCOPE,
+  },
   {
     name: "no banned palette",
     pattern:
