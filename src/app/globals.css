@@ -107,6 +107,14 @@ body {
   letter-spacing: 0.08em;
 }
 
+/* Keep keyboard focus consistent across first-party controls and MapLibre's
+   injected canvas, controls and attribution links. Component utilities still
+   choose inside/outside offsets; the colour and weight are universal. */
+:where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: 2px solid var(--bt-saffron) !important;
+  outline-offset: 2px;
+}
+
 /* --------------------------------------------------------------- hatch
    The "not real" treatment: DEMO provenance and walk segments. The single
    gradient the negative rules permit (spec section 7). */

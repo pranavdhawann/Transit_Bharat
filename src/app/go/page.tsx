@@ -5,7 +5,7 @@ export default function GoPage() {
   return (
     <Suspense
       fallback={
-        <div className="py-16 text-center text-sm text-slate-400">
+        <div className="py-16 text-center text-sm text-ink-3">
           Preparing navigation…
         </div>
       }

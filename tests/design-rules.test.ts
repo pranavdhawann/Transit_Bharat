@@ -5,14 +5,10 @@ import { THEMES } from "@/lib/tokens";
 
 /**
  * Files not yet migrated to the wayfinding system (spec section 7).
- * This list may only ever shrink. When it is empty, delete it and the
- * filter below.
+ * This list may only ever shrink. The completion test below keeps it empty so
+ * future migrations cannot quietly reintroduce exemptions.
  */
-const ALLOWLIST: string[] = [
-  "src/app/plan/page.tsx",
-  "src/app/go/page.tsx",
-  "src/components/LangToggle.tsx",
-];
+const ALLOWLIST: string[] = [];
 
 /**
  * RouteBar and JourneyTimeline use an INSET box-shadow as a keyline/ring,
@@ -214,6 +210,20 @@ describe("allowlist hygiene", () => {
   it("lists only files that still exist", () => {
     const missing = ALLOWLIST.filter((f) => !FILES.includes(f));
     expect(missing).toEqual([]);
+  });
+});
+
+describe("migration is complete", () => {
+  it("has an empty allowlist", () => {
+    expect(ALLOWLIST).toEqual([]);
+  });
+
+  it("keeps a saffron focus ring on native and injected interactive controls", () => {
+    const css = readFileSync("src/app/globals.css", "utf8");
+    expect(css).toContain(
+      ":where(a, button, input, select, textarea, summary, [tabindex]):focus-visible",
+    );
+    expect(css).toContain("outline: 2px solid var(--bt-saffron) !important;");
   });
 });
 
