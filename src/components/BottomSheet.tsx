@@ -33,10 +33,10 @@ export type Snap = "peek" | "half" | "full";
  * baseline-aligned metrics row can round up a pixel on some font metrics).
  *
  * 6rem = 96px would cut the sheet off halfway through the duration row, so
- * peek is 9.5rem = 152px: the smallest half-rem step that clears 147.5px.
+ * peek is 148px: the smallest whole CSS pixel that clears 147.5px.
  */
 const HEIGHTS: Record<Snap, string> = {
-  peek: "9.5rem",
+  peek: "148px",
   half: "50vh",
   full: "calc(100vh - 3rem)",
 };
