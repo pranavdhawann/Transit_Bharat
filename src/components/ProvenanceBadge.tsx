@@ -20,7 +20,7 @@ export default function ProvenanceBadge({
     >
       <span
         aria-hidden
-        className={`h-1.5 w-1.5 rounded-full ${meta.dotClassName}`}
+        className={`h-2 w-2 ${meta.dotClassName}`}
       />
       {meta.label}
       {suffix ? <span className="lowercase tracking-normal">· {suffix}</span> : null}
