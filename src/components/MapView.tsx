@@ -387,7 +387,7 @@ export default function MapView({
     >
       <div
         ref={containerRef}
-        className="absolute inset-0"
+        className="h-full w-full"
         aria-label="Journey map"
         role="application"
       />
