@@ -15,7 +15,6 @@ const ALLOWLIST: string[] = [
   "src/app/go/go-client.tsx",
   "src/app/go/page.tsx",
   "src/app/about/page.tsx",
-  "src/components/PlaceInput.tsx",
   "src/components/RouteCard.tsx",
   "src/components/JourneyTimeline.tsx",
   "src/components/LangToggle.tsx",

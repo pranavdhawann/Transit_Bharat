@@ -16,14 +16,14 @@ export default function PlaceInput({
   placeholder,
   value,
   onSelect,
-  iconColor = "bg-slate-400",
+  position = "solo",
 }: {
   id: string;
   label: string;
   placeholder: string;
   value: PlaceResult | null;
   onSelect: (p: PlaceResult | null) => void;
-  iconColor?: string;
+  position?: "top" | "bottom" | "solo";
 }) {
   const [text, setText] = useState("");
   const [results, setResults] = useState<PlaceResult[]>([]);
@@ -135,13 +135,24 @@ export default function PlaceInput({
   const showEmptyState =
     open && !loading && results.length === 0 && text.trim().length >= MIN_QUERY;
 
+  const bullet =
+    position === "top"
+      ? "border-2 border-ink bg-transparent"
+      : position === "bottom"
+        ? "bg-ink"
+        : "bg-ink-3";
+
   return (
     <div ref={boxRef} className="relative">
       <label htmlFor={id} className="sr-only">
         {label}
       </label>
-      <div className="flex items-center gap-3 rounded-xl border border-slate-300 bg-white px-3 py-2.5 shadow-sm focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-100">
-        <span aria-hidden className={`h-2.5 w-2.5 shrink-0 rounded-full ${iconColor}`} />
+      <div
+        className={`flex items-center gap-3 border-rule bg-surface px-3 py-3 focus-within:outline-2 focus-within:outline-offset-[-2px] focus-within:outline-saffron ${
+          position === "top" ? "border-x border-t" : "border"
+        }`}
+      >
+        <span aria-hidden className={`h-2.5 w-2.5 shrink-0 rounded-full ${bullet}`} />
         <input
           id={id}
           type="text"
@@ -153,7 +164,7 @@ export default function PlaceInput({
             open && activeIdx >= 0 ? `${listboxId}-opt-${activeIdx}` : undefined
           }
           autoComplete="off"
-          className="w-full bg-transparent text-base outline-none placeholder:text-slate-400"
+          className="w-full bg-transparent text-base outline-none placeholder:text-ink-3"
           placeholder={placeholder}
           value={text}
           onChange={(e) => {
@@ -200,7 +211,7 @@ export default function PlaceInput({
             type="button"
             onClick={clear}
             aria-label={`Clear ${label}`}
-            className="shrink-0 rounded-full px-1.5 text-lg leading-none text-slate-400 hover:text-slate-700 focus-visible:outline-2 focus-visible:outline-blue-600"
+            className="shrink-0 rounded-full px-1.5 text-lg leading-none text-ink-3 hover:text-ink focus-visible:outline-2 focus-visible:outline-saffron"
           >
             &times;
           </button>
@@ -208,9 +219,9 @@ export default function PlaceInput({
       </div>
 
       {open && (results.length > 0 || showEmptyState) && (
-        <div className="absolute z-20 mt-1 w-full overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg">
+        <div className="absolute z-20 mt-1 w-full overflow-hidden border border-rule bg-surface">
           {results.length > 0 && kind === "suggestions" && (
-            <p className="px-3 pt-2 pb-1 text-xs font-semibold tracking-wide text-slate-400 uppercase">
+            <p className="type-micro px-3 pt-2 pb-1 text-ink-3">
               Popular places
             </p>
           )}
@@ -234,11 +245,11 @@ export default function PlaceInput({
                   onMouseEnter={() => setActiveIdx(i)}
                   onClick={() => choose(r)}
                   className={`flex w-full items-center justify-between gap-2 px-3 py-2.5 text-left text-sm ${
-                    i === activeIdx ? "bg-blue-50" : ""
+                    i === activeIdx ? "border-l-2 border-saffron bg-paper" : ""
                   }`}
                 >
                   <span className="font-medium">{r.name}</span>
-                  <span className="shrink-0 text-xs text-slate-400">
+                  <span className="type-micro shrink-0 text-ink-3">
                     {r.detail ?? r.type}
                   </span>
                 </button>
@@ -246,7 +257,7 @@ export default function PlaceInput({
             ))}
           </ul>
           {showEmptyState && (
-            <p className="px-3 py-3 text-sm text-slate-500">
+            <p className="px-3 py-3 text-sm text-ink-3">
               No stop or landmark matches that. Try a nearby metro station, or a
               landmark like Connaught Place.
             </p>
