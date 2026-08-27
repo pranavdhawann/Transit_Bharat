@@ -9,7 +9,6 @@ import { THEMES } from "@/lib/tokens";
  * filter below.
  */
 const ALLOWLIST: string[] = [
-  "src/app/plan/plan-client.tsx",
   "src/app/plan/page.tsx",
   "src/app/go/go-client.tsx",
   "src/app/go/page.tsx",

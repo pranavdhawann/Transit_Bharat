@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import BottomSheet, { type Snap } from "@/components/BottomSheet";
 import JourneyTimeline from "@/components/JourneyTimeline";
 import LangToggle from "@/components/LangToggle";
 import MapView from "@/components/MapView";
@@ -17,6 +18,10 @@ import {
 } from "@/lib/scenario-client";
 import type { DisruptionNote } from "@/lib/explain";
 import type { Journey, ScenarioState, Vehicle } from "@/lib/types";
+
+/** The one control treatment on this page: 2px radius, rule border, ink label. */
+const CONTROL =
+  "rounded-[2px] border border-rule bg-surface px-3 py-2 type-micro text-ink hover:bg-paper focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-saffron";
 
 export default function PlanClient() {
   const params = useSearchParams();
@@ -43,6 +48,8 @@ export default function PlanClient() {
   }, []);
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<DisruptionNote | null>(null);
+  // Mobile only: the sheet is a static column at lg and above.
+  const [snap, setSnap] = useState<Snap>("half");
 
   const fetchJourneys = useCallback(async () => {
     setError(null);
@@ -208,11 +215,8 @@ export default function PlanClient() {
   if (!fromId || !toId) {
     return (
       <div className="py-16 text-center">
-        <p className="text-slate-600">Pick a start and destination first.</p>
-        <Link
-          href="/"
-          className="mt-3 inline-block font-medium text-blue-600 hover:underline"
-        >
+        <p className="text-ink-2">Pick a start and destination first.</p>
+        <Link href="/" className={`mt-3 inline-block ${CONTROL}`}>
           Back to search
         </Link>
       </div>
@@ -226,28 +230,28 @@ export default function PlanClient() {
     journeys.some((j) => j.disrupted);
 
   return (
-    <div className="space-y-5">
-      <div className="flex flex-wrap items-center gap-3">
-        <Link
-          href="/"
-          className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium shadow-sm hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-blue-600"
-        >
+    <div className="space-y-4">
+      {/* Toolbar. Spans the full width at both breakpoints, so it sits above
+          the map on mobile instead of inside the sheet — at peek the sheet
+          must open on the top result's RouteBar, not on the controls. */}
+      <div className="flex flex-wrap items-center gap-2 border-b border-rule pb-3">
+        <Link href="/" className={CONTROL}>
           &larr; New search
         </Link>
-        <h1 className="text-lg font-semibold tracking-tight">Route options</h1>
+        <h1 className="type-display text-lg">Route options</h1>
         <div className="ml-auto flex items-center gap-2">
           {/* The disruption note below is bilingual, so the rider needs the
               switch on this page and not only on the home screen. */}
           <LangToggle />
           {scenario?.active ? (
             <>
-              <span className="rounded-full border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-700">
-                Demo disruption: bus {scenario.routeNumber} +{scenario.delayMinutes} min
+              <span className="type-micro border border-stale px-2 py-1 text-stale">
+                Demo delay · bus {scenario.routeNumber} +{scenario.delayMinutes} min
               </span>
               <button
                 onClick={() => void resetDemo()}
                 disabled={busy}
-                className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium shadow-sm hover:bg-slate-50 disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-600"
+                className={`${CONTROL} disabled:opacity-50`}
               >
                 Reset demo
               </button>
@@ -256,7 +260,7 @@ export default function PlanClient() {
             <button
               onClick={() => void triggerDisruption()}
               disabled={busy}
-              className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium shadow-sm hover:bg-slate-50 disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-600"
+              className={`${CONTROL} disabled:opacity-50`}
             >
               Simulate delay (demo)
             </button>
@@ -264,87 +268,99 @@ export default function PlanClient() {
         </div>
       </div>
 
-      {note && (
-        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
-          <p className="text-sm leading-relaxed text-amber-900">
-            {lang === "hi" ? note.hi : note.en}
-          </p>
-          <p className="mt-2 text-xs text-amber-700">
-            {note.source === "openai"
-              ? `Wording by ${note.model ?? "OpenAI"}${note.latencyMs !== null ? ` · ${note.latencyMs} ms` : ""}`
-              : `Wording from the built-in template${note.fallbackReason ? ` · ${note.fallbackReason}` : ""}`}
-            {" · times and fares from the deterministic planner"}
-          </p>
-        </div>
-      )}
+      <div className="lg:grid lg:grid-cols-[minmax(0,26rem)_1fr] lg:items-start lg:gap-5">
+        {/* Mobile: the three-snap sheet over the map. Desktop: the static
+            left column. One subtree either way — the list is never
+            duplicated in the DOM. */}
+        <BottomSheet snap={snap} onSnapChange={setSnap} label="Route options">
+          <div className="space-y-3">
+            {journeys?.map((j) => (
+              <RouteCard
+                key={j.id}
+                journey={j}
+                selected={j.id === selected?.id}
+                onSelect={(id) => setSelectedId(id)}
+              />
+            ))}
 
-      {error && (
-        <p className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-          {error}
-        </p>
-      )}
+            {error && (
+              <p className="border border-ink bg-surface p-4 text-sm text-ink">
+                {error}
+              </p>
+            )}
 
-      {!journeys && !error && (
-        <p className="py-10 text-center text-sm text-slate-400">
-          Planning your journey…
-        </p>
-      )}
+            {!journeys && !error && (
+              <p className="py-10 text-center text-sm text-ink-3">
+                Planning your journey…
+              </p>
+            )}
 
-      {journeys && journeys.length === 0 && (
-        <p className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
-          No route found between these places on the Delhi pilot network yet.
-          Try one of the suggested demo journeys.
-        </p>
-      )}
+            {journeys && journeys.length === 0 && (
+              <p className="border border-rule bg-surface p-4 text-sm text-ink-2">
+                No route found between these places on the Delhi pilot network
+                yet. Try one of the suggested demo journeys.
+              </p>
+            )}
 
-      {betterAltExists && (
-        <p className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm font-medium text-emerald-800">
-          Better route found — options without the delayed bus now arrive earlier.
-        </p>
-      )}
+            {/* Notices sit under the list: the cards are the answer, and at
+                peek nothing may push the top result's RouteBar out of view. */}
+            {betterAltExists && (
+              <p className="border border-live bg-surface p-3 text-sm font-medium text-ink">
+                Better route found — options without the delayed bus now arrive
+                earlier.
+              </p>
+            )}
 
-      <div className="space-y-3">
-        {journeys?.map((j) => (
-          <RouteCard
-            key={j.id}
-            journey={j}
-            selected={j.id === selected?.id}
-            onSelect={(id) => setSelectedId(id)}
+            {note && (
+              <div className="border border-stale bg-surface p-4">
+                <p className="text-sm leading-relaxed text-ink">
+                  {lang === "hi" ? note.hi : note.en}
+                </p>
+                <p className="mt-2 text-xs text-ink-3">
+                  {note.source === "openai"
+                    ? `Wording by ${note.model ?? "OpenAI"}${note.latencyMs !== null ? ` · ${note.latencyMs} ms` : ""}`
+                    : `Wording from the built-in template${note.fallbackReason ? ` · ${note.fallbackReason}` : ""}`}
+                  {" · times and fares from the deterministic planner"}
+                </p>
+              </div>
+            )}
+
+            {selected && (
+              <section
+                aria-labelledby="detail-heading"
+                className="space-y-4 border border-rule bg-surface p-4 sm:p-5"
+              >
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <h2 id="detail-heading" className="type-display text-base">
+                    Journey details
+                  </h2>
+                  <button
+                    onClick={startGo}
+                    className="type-display rounded-[2px] bg-ink px-4 py-2 text-sm text-paper hover:bg-ink-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-saffron"
+                  >
+                    Start GO navigation &rarr;
+                  </button>
+                </div>
+
+                {trackedVehicle && <LiveStrip vehicle={trackedVehicle} />}
+                <JourneyTimeline journey={selected} />
+              </section>
+            )}
+          </div>
+        </BottomSheet>
+
+        {/* The single MapView JSX site. Full-bleed under the sheet on mobile,
+            sticky right column on desktop — repositioned by classes only, so
+            the MapLibre instance survives every breakpoint change. */}
+        <div className="-mx-4 h-[calc(100vh-9rem)] min-h-[18rem] lg:sticky lg:top-16 lg:mx-0 lg:h-[calc(100vh-6rem)]">
+          <MapView
+            legs={selected?.legs ?? []}
+            vehicles={vehicles}
+            highlightVehicleId={trackedVehicle?.id ?? null}
+            className="h-full w-full"
           />
-        ))}
+        </div>
       </div>
-
-      {selected && (
-        <section
-          aria-labelledby="detail-heading"
-          className="space-y-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6"
-        >
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <h2 id="detail-heading" className="text-lg font-semibold tracking-tight">
-              Journey details
-            </h2>
-            <button
-              onClick={startGo}
-              className="rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700"
-            >
-              Start GO navigation &rarr;
-            </button>
-          </div>
-
-          <div className="grid gap-5 lg:grid-cols-2">
-            <MapView
-              legs={selected.legs}
-              vehicles={vehicles}
-              highlightVehicleId={trackedVehicle?.id ?? null}
-              className="h-64 w-full sm:h-80 lg:h-[26rem]"
-            />
-            <div>
-              {trackedVehicle && <LiveStrip vehicle={trackedVehicle} />}
-              <JourneyTimeline journey={selected} />
-            </div>
-          </div>
-        </section>
-      )}
     </div>
   );
 }
@@ -356,18 +372,18 @@ function LiveStrip({ vehicle }: { vehicle: Vehicle }) {
     Math.round((now - new Date(vehicle.updatedAt).getTime()) / 1000),
   );
   return (
-    <div className="mb-4 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-xl border border-violet-200 bg-violet-50 px-3 py-2 text-sm text-violet-900">
-      <span className="font-semibold">
+    // `hatch` is the "not real" treatment shared with the DEMO provenance
+    // badge and walk segments: synthetic data never looks like measured data.
+    <div className="hatch flex flex-wrap items-center gap-x-2 gap-y-1 border border-rule bg-paper px-3 py-2 text-sm text-ink-2">
+      <span className="type-micro text-ink">
         DEMO LIVE &middot; bus {vehicle.routeNumber}-{vehicle.id.split("-")[1]}
       </span>
       <span>updated {fmtAge(ageSec)}</span>
-      <span className="text-violet-700">
+      <span>
         &middot; next stop: {vehicle.nextStopName}
         {vehicle.delayMinutes > 0 ? " · delayed +" + vehicle.delayMinutes + " min" : ""}
       </span>
-      <span className="ml-auto text-[11px] uppercase tracking-wide text-violet-500">
-        Synthetic data
-      </span>
+      <span className="type-micro ml-auto text-ink-3">Synthetic data</span>
     </div>
   );
 }
