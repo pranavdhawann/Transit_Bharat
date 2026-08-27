@@ -3,11 +3,13 @@
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import LangToggle from "@/components/LangToggle";
 import ModeIcon from "@/components/ModeIcon";
 import MapView from "@/components/MapView";
 import ProvenanceBadge from "@/components/ProvenanceBadge";
 import { fmtClockIST, fmtDurationMinutes, fmtWalk } from "@/lib/format";
 import { useVehicles } from "@/lib/hooks";
+import { loadScenario, scenarioQuery } from "@/lib/scenario-client";
 import type { Journey, Leg, Vehicle } from "@/lib/types";
 
 interface Boundary {
@@ -51,8 +53,10 @@ export default function GoClient() {
               fromId,
               toId,
               lessWalking: params.get("lessWalk") === "1",
+              scenario: loadScenario(),
             }),
           });
+          if (!res.ok) throw new Error("planning failed");
           const data = (await res.json()) as { journeys: Journey[] };
           const pick =
             data.journeys.find((j) => j.id === sel) ?? data.journeys[0];
@@ -155,7 +159,11 @@ function GoNavigator({ initialJourney }: { initialJourney: Journey }) {
     ];
     return nums.length ? nums : null;
   }, [journey]);
-  const vehicles = useVehicles(running && !arrived ? busRoutes : null);
+  const vehicles = useVehicles(
+    running && !arrived ? busRoutes : null,
+    4000,
+    scenarioQuery(loadScenario()),
+  );
 
   const trackedVehicle = useMemo(() => {
     if (!current || current.leg.mode !== "BUS") return null;
@@ -236,8 +244,9 @@ function GoNavigator({ initialJourney }: { initialJourney: Journey }) {
       const res = await fetch("/api/journeys", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(q),
+        body: JSON.stringify({ ...q, scenario: loadScenario() }),
       });
+      if (!res.ok) return;
       const data = (await res.json()) as { journeys: Journey[] };
       const disrupted = data.journeys.find((j) => j.disrupted) ?? journey;
       const alt = data.journeys
@@ -246,11 +255,13 @@ function GoNavigator({ initialJourney }: { initialJourney: Journey }) {
       const delayMin =
         disrupted.legs.find((l) => typeof l.delayMinutes === "number")
           ?.delayMinutes ?? 11;
-      if (alt) {
-        const savedMin = Math.round(
-          (Date.parse(disrupted.arriveAt) - Date.parse(alt.arriveAt)) / 60000,
-        );
-        setBanner({ altJourney: alt, savedMin: Math.max(savedMin, 1), delayMin });
+      const savedMin = alt
+        ? Math.round(
+            (Date.parse(disrupted.arriveAt) - Date.parse(alt.arriveAt)) / 60000,
+          )
+        : 0;
+      if (alt && savedMin > 0) {
+        setBanner({ altJourney: alt, savedMin, delayMin });
       } else {
         setBanner({ altJourney: journey, savedMin: 0, delayMin });
       }
@@ -289,12 +300,17 @@ function GoNavigator({ initialJourney }: { initialJourney: Journey }) {
   return (
     <div className="mx-auto max-w-xl space-y-4">
       <div className="flex items-center justify-between gap-2">
-        <Link
-          href="/"
-          className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium shadow-sm hover:bg-slate-50"
-        >
-          &larr; Exit GO
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link
+            href="/"
+            className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium shadow-sm hover:bg-slate-50"
+          >
+            &larr; Exit GO
+          </Link>
+          {/* Riders often land straight in GO from a shared link, so the
+              language switch has to be reachable here too. */}
+          <LangToggle />
+        </div>
         <span className="rounded-full border border-violet-200 bg-violet-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-violet-700">
           Synthetic realtime data · DEMO
         </span>
@@ -358,7 +374,7 @@ function GoNavigator({ initialJourney }: { initialJourney: Journey }) {
               </p>
               <button
                 onClick={switchRoute}
-                className="mt-2 rounded-lg bg-red-700 px-4 py-2 text-xs font-bold uppercase tracking-wide text-white hover:bg-red-800"
+                className="mt-2 rounded-lg bg-red-700 px-4 py-2 text-xs font-bold uppercase tracking-wide text-white hover:bg-red-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
               >
                 Switch route
               </button>
@@ -390,7 +406,7 @@ function GoNavigator({ initialJourney }: { initialJourney: Journey }) {
                 </Link>
                 <button
                   onClick={restart}
-                  className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium hover:bg-slate-50"
+                  className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-blue-600"
                 >
                   Replay demo
                 </button>
@@ -399,7 +415,7 @@ function GoNavigator({ initialJourney }: { initialJourney: Journey }) {
               <>
                 <button
                   onClick={advance}
-                  className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700"
+                  className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900"
                 >
                   Advance &rarr;
                 </button>
@@ -409,7 +425,7 @@ function GoNavigator({ initialJourney }: { initialJourney: Journey }) {
                       key={s}
                       onClick={() => setSpeed(s as 1 | 30)}
                       aria-pressed={speed === s}
-                      className={`px-3 py-2 text-xs font-medium ${
+                      className={`px-3 py-2 text-xs font-medium focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-blue-600 ${
                         speed === s ? "bg-slate-900 text-white" : "bg-white text-slate-600 hover:bg-slate-50"
                       }`}
                     >
@@ -421,7 +437,7 @@ function GoNavigator({ initialJourney }: { initialJourney: Journey }) {
                   <button
                     onClick={() => void simulateDelay()}
                     disabled={busy}
-                    className="ml-auto rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-xs font-semibold text-red-700 hover:bg-red-100 disabled:opacity-50"
+                    className="ml-auto rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-xs font-semibold text-red-700 hover:bg-red-100 disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-red-600"
                   >
                     Simulate delay (demo)
                   </button>
@@ -459,7 +475,9 @@ function JourneySummary({ journey }: { journey: Journey }) {
           <span>
             {leg.mode === "WALK"
               ? `Walk ${fmtWalk(leg.walkingMeters ?? 0)} to ${leg.to.name}`
-              : `${leg.routeNumber} ${leg.routeName} · ${leg.from.name} → ${leg.to.name}`}
+              : leg.mode === "AUTO"
+                ? `Auto · ${leg.from.name} → ${leg.to.name}`
+                : `${leg.routeNumber} ${leg.routeName} · ${leg.from.name} → ${leg.to.name}`}
           </span>
           <span className="ml-auto shrink-0 text-xs text-slate-400">
             ~{Math.round(leg.durationMinutes)} min
@@ -509,7 +527,9 @@ function Instruction({
             Get ready
           </p>
           <h1 className="mt-1 text-2xl font-bold leading-tight">
-            Wait for {leg.mode === "BUS" ? "bus" : "metro"} {leg.routeNumber}
+            {leg.mode === "AUTO"
+              ? "Wait for your auto"
+              : `Wait for ${leg.mode === "BUS" ? "bus" : "metro"} ${leg.routeNumber}`}
           </h1>
           <p className="mt-1 flex flex-wrap items-center gap-2 text-sm text-slate-300">
             Board at {leg.from.name} · arrives {fmtClockIST(new Date(boundary.rideStart).toISOString())}
@@ -523,12 +543,13 @@ function Instruction({
         <p className="text-xs font-semibold uppercase tracking-widest text-amber-300">
           Approaching
         </p>
-        <h1 className="mt-1 text-2xl font-bold leading-tight">
-          Your {leg.mode === "BUS" ? "bus" : "train"} is arriving
-        </h1>
-        <p className="mt-1 text-sm text-slate-300">
-          Stand at {leg.from.name} — board toward {leg.headsign}.
-        </p>
+          <h1 className="mt-1 text-2xl font-bold leading-tight">
+            Your {leg.mode === "AUTO" ? "auto" : leg.mode === "BUS" ? "bus" : "train"} is arriving
+          </h1>
+          <p className="mt-1 text-sm text-slate-300">
+            Stand at {leg.from.name}
+            {leg.headsign ? ` — board toward ${leg.headsign}.` : "."}
+          </p>
       </>
     );
   }
@@ -543,7 +564,7 @@ function Instruction({
     Math.ceil(stopsTotal * (1 - rideFrac)),
   );
 
-  if (stopsRemaining <= 1) {
+  if (stopsRemaining <= 1 && leg.mode !== "AUTO") {
     return (
       <>
         <p className="text-xs font-semibold uppercase tracking-widest text-orange-300">
@@ -565,14 +586,17 @@ function Instruction({
         On board
       </p>
       <h1 className="mt-1 text-2xl font-bold leading-tight">
-        Ride {leg.mode === "BUS" ? "bus" : "metro"} {leg.routeNumber}
+        {leg.mode === "AUTO"
+          ? "Ride your auto"
+          : `Ride ${leg.mode === "BUS" ? "bus" : "metro"} ${leg.routeNumber}`}
         <span className="block text-base font-medium text-slate-300">
           {leg.from.name} &rarr; {leg.to.name}
         </span>
       </h1>
       <p className="mt-1 text-sm text-slate-300">
-        {stopsRemaining} stop{stopsRemaining === 1 ? "" : "s"} remaining · get
-        off at {leg.to.name}
+        {leg.mode === "AUTO"
+          ? `Get off at ${leg.to.name}`
+          : `${stopsRemaining} stop${stopsRemaining === 1 ? "" : "s"} remaining · get off at ${leg.to.name}`}
       </p>
     </>
   );
@@ -597,7 +621,9 @@ function UpNext({
           <li key={i}>
             {b.leg.mode === "WALK"
               ? `Walk to ${b.leg.to.name}`
-              : `${b.leg.routeNumber} from ${b.leg.from.name}`}{" "}
+              : b.leg.mode === "AUTO"
+                ? `Auto from ${b.leg.from.name}`
+                : `${b.leg.routeNumber} from ${b.leg.from.name}`}{" "}
             · {fmtDurationMinutes(b.leg.durationMinutes)}
           </li>
         ))}

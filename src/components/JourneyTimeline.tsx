@@ -32,9 +32,13 @@ export default function JourneyTimeline({ journey }: { journey: Journey }) {
                   {isTransit ? (
                     <>
                       {modeLabel(leg.mode)}{" "}
-                      <span style={{ color: accent }}>
-                        {leg.routeNumber} · {leg.routeName}
-                      </span>
+                      {(leg.routeNumber || leg.routeName) && (
+                        <span style={{ color: accent }}>
+                          {[leg.routeNumber, leg.routeName]
+                            .filter(Boolean)
+                            .join(" · ")}
+                        </span>
+                      )}
                     </>
                   ) : (
                     <>
@@ -53,7 +57,24 @@ export default function JourneyTimeline({ journey }: { journey: Journey }) {
                 )}
               </div>
 
-              {isTransit ? (
+              {leg.mode === "AUTO" ? (
+                <div className="mt-0.5 space-y-0.5 text-sm text-slate-600">
+                  <p>
+                    Hail an auto near{" "}
+                    <span className="font-medium">{leg.from.name}</span> ·{" "}
+                    {fmtClockIST(leg.departAt)}
+                  </p>
+                  <p>
+                    Get off at{" "}
+                    <span className="font-medium">{leg.to.name}</span> ·{" "}
+                    {fmtClockIST(leg.arriveAt)}
+                  </p>
+                  <p className="text-xs text-slate-500">
+                    Metered fare · estimate ·{" "}
+                    {fmtDurationMinutes(leg.durationMinutes)} ride
+                  </p>
+                </div>
+              ) : isTransit ? (
                 <div className="mt-0.5 space-y-0.5 text-sm text-slate-600">
                   <p>
                     Board at{" "}
@@ -67,8 +88,8 @@ export default function JourneyTimeline({ journey }: { journey: Journey }) {
                   </p>
                   <p className="text-xs text-slate-500">
                     {leg.intermediateStops.length} stop
-                    {leg.intermediateStops.length === 1 ? "" : "s"} in between ·
-                    toward {leg.headsign} ·{" "}
+                    {leg.intermediateStops.length === 1 ? "" : "s"} in between
+                    {leg.headsign ? ` · toward ${leg.headsign}` : ""} ·{" "}
                     {fmtDurationMinutes(leg.durationMinutes)} ride
                   </p>
                 </div>

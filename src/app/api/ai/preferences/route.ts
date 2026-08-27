@@ -17,7 +17,8 @@ export async function POST(request: Request) {
   } catch {
     body = {};
   }
-  const text = (body.text ?? "").slice(0, 500).trim();
+  const text =
+    (typeof body.text === "string" ? body.text : "").slice(0, 500).trim();
   if (text.length < 4) {
     return NextResponse.json(
       { error: "EMPTY_TEXT", message: "Describe your trip in a sentence." },

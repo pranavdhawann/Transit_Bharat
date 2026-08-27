@@ -7,6 +7,8 @@ import type { Vehicle } from "./types";
 export function useVehicles(
   routeNumbers: string[] | null,
   intervalMs = 4000,
+  /** Demo delay carried by the client so it survives serverless instances. */
+  delayQuery = "",
 ): Vehicle[] {
   const key = routeNumbers ? routeNumbers.slice().sort().join(",") : "";
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
@@ -19,7 +21,9 @@ export function useVehicles(
     let cancelled = false;
     async function tick() {
       try {
-        const res = await fetch(`/api/vehicles?route=${encodeURIComponent(key)}`);
+        const res = await fetch(
+          `/api/vehicles?route=${encodeURIComponent(key)}${delayQuery}`,
+        );
         const data = (await res.json()) as { vehicles?: Vehicle[] };
         if (!cancelled) setVehicles(data.vehicles ?? []);
       } catch {
@@ -32,7 +36,7 @@ export function useVehicles(
       cancelled = true;
       clearInterval(timer);
     };
-  }, [key, intervalMs]);
+  }, [key, intervalMs, delayQuery]);
 
   return vehicles;
 }

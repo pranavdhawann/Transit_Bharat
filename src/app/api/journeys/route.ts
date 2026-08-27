@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
-import { getPlace, searchPlaces } from "@/lib/places";
+import { getPlace } from "@/lib/places";
 import {
   DEFAULT_MAX_WALK_METERS,
   LESS_WALK_MAX_METERS,
 } from "@/data/network";
 import { planJourneys } from "@/lib/graph";
-import { getScenario } from "@/lib/scenario";
+import { delayFrom, resolveScenario } from "@/lib/scenario";
 import type { Journey } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -14,6 +14,14 @@ interface JourneysRequest {
   fromId?: string;
   toId?: string;
   lessWalking?: boolean;
+  /** Interchange cap from a stated accessibility constraint. */
+  maxTransfers?: number;
+  /**
+   * Demo scenario echoed back by the client. Serverless instances do not share
+   * memory, so this - not server state - is what makes the delay demo reliable
+   * in production. Validated and clamped in parseScenario.
+   */
+  scenario?: unknown;
 }
 
 /**
@@ -29,8 +37,10 @@ export async function POST(request: Request) {
     body = {};
   }
 
-  const from = resolvePlace(body.fromId);
-  const to = resolvePlace(body.toId);
+  const fromId = typeof body.fromId === "string" ? body.fromId : undefined;
+  const toId = typeof body.toId === "string" ? body.toId : undefined;
+  const from = resolvePlace(fromId);
+  const to = resolvePlace(toId);
   if (!from || !to) {
     return NextResponse.json(
       { error: "UNKNOWN_PLACE", message: "Search and pick both places first." },
@@ -38,11 +48,8 @@ export async function POST(request: Request) {
     );
   }
 
-  const scenario = getScenario();
-  const delay =
-    scenario.active && scenario.routeNumber
-      ? { routeNumber: scenario.routeNumber, minutes: scenario.delayMinutes }
-      : null;
+  const scenario = resolveScenario(body.scenario);
+  const delay = delayFrom(scenario);
 
   const journeys: Journey[] = planJourneys({
     origin: { name: displayName(from), lat: from.lat, lon: from.lon },
@@ -52,11 +59,16 @@ export async function POST(request: Request) {
       : DEFAULT_MAX_WALK_METERS,
     departAtMs: Date.now(),
     delay,
+    ...(typeof body.maxTransfers === "number" &&
+    Number.isFinite(body.maxTransfers) &&
+    body.maxTransfers >= 0
+      ? { maxTransfers: Math.min(4, Math.round(body.maxTransfers)) }
+      : {}),
   }).map((j) => ({
     ...j,
     query: {
-      fromId: body.fromId!,
-      toId: body.toId!,
+      fromId: fromId!,
+      toId: toId!,
       maxWalkMeters: body.lessWalking
         ? LESS_WALK_MAX_METERS
         : DEFAULT_MAX_WALK_METERS,
@@ -76,10 +88,7 @@ export async function POST(request: Request) {
 
 function resolvePlace(id?: string) {
   if (!id) return null;
-  const direct = getPlace(id);
-  if (direct) return direct;
-  const hits = searchPlaces(id, 1);
-  return hits[0] ?? null;
+  return getPlace(id.trim());
 }
 
 function displayName(p: { name: string; type: string }): string {

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { simulateVehicles } from "@/lib/vehicles";
-import { getScenario } from "@/lib/scenario";
+import { delayFrom, resolveScenario } from "@/lib/scenario";
 
 export const dynamic = "force-dynamic";
 
@@ -11,11 +11,21 @@ export async function GET(request: Request) {
     ? routeParam.split(",").map((r) => r.trim()).filter(Boolean)
     : undefined;
 
-  const scenario = getScenario();
-  const delay =
-    scenario.active && scenario.routeNumber
-      ? { routeNumber: scenario.routeNumber, minutes: scenario.delayMinutes }
-      : null;
+  // Same instance-independence as /api/journeys: the client tells us which
+  // route is delayed rather than relying on this lambda remembering it.
+  const delayRoute = searchParams.get("delayRoute");
+  const delayMinutes = Number(searchParams.get("delayMinutes"));
+  const scenario = resolveScenario(
+    delayRoute
+      ? {
+          active: true,
+          routeNumber: delayRoute,
+          delayMinutes,
+          triggeredAt: Date.now(),
+        }
+      : undefined,
+  );
+  const delay = delayFrom(scenario);
 
   const vehicles = simulateVehicles({ routeNumbers, nowMs: Date.now(), delay });
 

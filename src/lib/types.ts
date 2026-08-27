@@ -1,4 +1,4 @@
-export type Mode = "WALK" | "BUS" | "SUBWAY";
+export type Mode = "WALK" | "AUTO" | "BUS" | "SUBWAY";
 
 /**
  * Data provenance states. This is the core product differentiator:

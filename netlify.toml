@@ -1,0 +1,22 @@
+[build]
+  command = "npm run build"
+  publish = ".next"
+
+[build.environment]
+  # Match the local toolchain. Netlify defaults to an older Node than Next 15
+  # wants; pinning avoids a green local build failing in CI.
+  NODE_VERSION = "20"
+
+# Required for Next.js App Router on Netlify: turns the five force-dynamic
+# route handlers under src/app/api into Netlify Functions and handles
+# streaming/SSR. Netlify auto-installs this for Next sites, but declaring it
+# makes the build reproducible instead of dependent on auto-detection.
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
+
+# The demo APIs must never be cached: vehicle positions are a function of the
+# server clock, and journeys depend on the scenario the client sends.
+[[headers]]
+  for = "/api/*"
+  [headers.values]
+    Cache-Control = "no-store"

@@ -16,7 +16,12 @@ export function useLang(): [Lang, (l: Lang) => void] {
   const [lang, setLangState] = useState<Lang>("en");
 
   useEffect(() => {
-    const stored = window.localStorage.getItem(STORAGE_KEY);
+    let stored: string | null = null;
+    try {
+      stored = window.localStorage.getItem(STORAGE_KEY);
+    } catch {
+      stored = null;
+    }
     if (stored === "hi" || stored === "en") setLangState(stored);
     const onChange = (e: Event) => {
       const detail = (e as CustomEvent<Lang>).detail;
@@ -27,7 +32,11 @@ export function useLang(): [Lang, (l: Lang) => void] {
   }, []);
 
   const setLang = useCallback((l: Lang) => {
-    window.localStorage.setItem(STORAGE_KEY, l);
+    try {
+      window.localStorage.setItem(STORAGE_KEY, l);
+    } catch {
+      // Storage unavailable (e.g. private mode) - keep session-only language.
+    }
     document.documentElement.lang = l === "hi" ? "hi-IN" : "en-IN";
     window.dispatchEvent(new CustomEvent<Lang>(EVENT, { detail: l }));
   }, []);

@@ -145,9 +145,14 @@ Transit Bharat API (normalized schema - frontend never sees raw feeds)
             Network derived from official snapshots (2023 vintage) - not current
             schedules; fares are estimates.
           </li>
+          <li>
+            Auto-rickshaw fallback (no PT + walk &gt; 15 min) uses simulated
+            speeds and metered-rate fare estimates - labeled DEMO like all
+            synthetic data.
+          </li>
           <li>Independent hackathon prototype - no government affiliation.</li>
           <li>
-            Full details: LIMITATIONS.md and DATA_SOURCES.md in the repository.
+            Full details: LIMITATIONS.md in the repository.
           </li>
         </ul>
       </section>

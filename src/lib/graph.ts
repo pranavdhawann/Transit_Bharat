@@ -8,6 +8,12 @@
  * LIMITATIONS.md).
  */
 import {
+  AUTO_ACCESS_MAX_METERS,
+  AUTO_ASSIST_TRIGGER_METERS,
+  AUTO_BOARD_MIN,
+  AUTO_SPEED_KMH,
+  AUTO_SWITCH_METERS,
+  AUTO_WALK_THRESHOLD_MIN,
   BUS_BOARD_MIN,
   BUS_DWELL_MIN,
   BUS_FARE_INR,
@@ -21,6 +27,7 @@ import {
   METRO_BOARD_MIN,
   TRANSFER_PENALTY_MIN,
   WALK_KMH,
+  autoFare,
   metroFare,
 } from "@/data/network";
 import { haversineMeters } from "./geo";
@@ -362,14 +369,12 @@ interface RawItinerary {
   chain: RawEdgeUse[];
   timeMin: number;
   fareInr: number;
-  walkingMeters: number;
   transfers: number;
 }
 
 function summarize(chain: RawEdgeUse[]): Omit<RawItinerary, "chain"> {
   let timeMin = 0;
   let fareInr = 0;
-  let walkingMeters = 0;
   const seenRoutes: string[] = [];
   let lastBoardedRoute: string | null = null;
   let subwayChainKm = 0;
@@ -390,7 +395,6 @@ function summarize(chain: RawEdgeUse[]): Omit<RawItinerary, "chain"> {
       flushSubway();
     }
     if (u.edge.routeKey) lastBoardedRoute = u.edge.routeKey;
-    if (u.edge.mode === "WALK") walkingMeters += u.edge.km * 1000;
     if (u.edge.routeKey && !seenRoutes.includes(u.edge.routeKey)) {
       seenRoutes.push(u.edge.routeKey);
     }
@@ -399,7 +403,6 @@ function summarize(chain: RawEdgeUse[]): Omit<RawItinerary, "chain"> {
   return {
     timeMin,
     fareInr,
-    walkingMeters,
     transfers: Math.max(0, seenRoutes.length - 1),
   };
 }
@@ -583,7 +586,11 @@ function toJourney(
     arriveAt: legs[legs.length - 1].arriveAt,
     durationMinutes,
     fareInr: Math.round(legs.reduce((a, l) => a + (l.fareInr ?? 0), 0)),
-    walkingMeters: Math.round(s.walkingMeters),
+    // Sum from the built legs, not the graph chain: access/egress walks are
+    // synthesized outside the chain, so chain-only totals miss them entirely.
+    walkingMeters: Math.round(
+      legs.reduce((a, l) => a + (l.walkingMeters ?? 0), 0),
+    ),
     transfers: s.transfers,
     legs,
     provenance: hasTransit ? "DEMO" : "SCHEDULED",
@@ -597,9 +604,247 @@ function hash(s: string): string {
   return h.toString(36);
 }
 
+// ---------------------------------------------------------- Auto fallback --
+
+/** Below this direct distance an auto is never offered (walk instead). */
+const AUTO_FALLBACK_MIN_METERS = 300;
+
+interface AutoPlace extends Pt {
+  id?: string;
+  name?: string;
+}
+
+/**
+ * Door-to-door auto-rickshaw itinerary for trips the PT network cannot serve
+ * when walking would exceed AUTO_WALK_THRESHOLD_MIN. Deliberately outside the
+ * graph machinery: no edges, no routeKey, so dedupe/ban logic never sees it.
+ */
+function buildAutoJourney(
+  origin: AutoPlace,
+  destination: AutoPlace,
+  departAtMs: number,
+): Journey {
+  const km = haversineMeters(origin, destination) / 1000;
+  const directWalkMin = (km / WALK_KMH) * 60;
+  const durationMinutes = Math.round(
+    AUTO_BOARD_MIN + (km / AUTO_SPEED_KMH) * 60,
+  );
+  const departAt = new Date(departAtMs).toISOString();
+  const arriveAt = new Date(departAtMs + durationMinutes * 60000).toISOString();
+  const fareInr = autoFare(km);
+  const leg: Leg = {
+    mode: "AUTO",
+    routeColor: "#d97706",
+    from: {
+      id: origin.id ?? "origin",
+      name: origin.name ?? "Start",
+      lat: origin.lat,
+      lon: origin.lon,
+    },
+    to: {
+      id: destination.id ?? "destination",
+      name: destination.name ?? "Destination",
+      lat: destination.lat,
+      lon: destination.lon,
+    },
+    intermediateStops: [],
+    departAt,
+    arriveAt,
+    durationMinutes,
+    waitMinutes: AUTO_BOARD_MIN,
+    fareInr,
+    polyline: [
+      [origin.lat, origin.lon],
+      [destination.lat, destination.lon],
+    ],
+    provenance: "DEMO",
+  };
+  return {
+    id: `auto:${leg.from.id}:${leg.to.id}`,
+    label: "RECOMMENDED",
+    departAt,
+    arriveAt,
+    durationMinutes,
+    fareInr,
+    walkingMeters: 0,
+    transfers: 0,
+    legs: [leg],
+    provenance: "DEMO",
+    disrupted: false,
+    why: [
+      "No bus or metro serves this trip directly",
+      `Saves about ${Math.round(directWalkMin - durationMinutes)} min vs walking`,
+      "Fare is a metered-rate estimate",
+    ],
+  };
+}
+
+/** The single product rule gating the auto option. */
+function autoFallback(
+  origin: AutoPlace,
+  destination: AutoPlace,
+  departAtMs: number,
+): Journey[] {
+  const meters = haversineMeters(origin, destination);
+  const directWalkMin = (meters / 1000 / WALK_KMH) * 60;
+  if (meters <= AUTO_FALLBACK_MIN_METERS || directWalkMin <= AUTO_WALK_THRESHOLD_MIN) {
+    return [];
+  }
+  return [buildAutoJourney(origin, destination, departAtMs)];
+}
+
+// ------------------------------------------- Auto first/last mile assist --
+
+/** Stable identity for dedupe across the normal and wide-radius passes. */
+function legSignature(j: Journey): string {
+  return j.legs
+    .map((l) => `${l.mode}:${l.routeNumber ?? ""}:${l.from.id}>${l.to.id}`)
+    .join("|");
+}
+
+/**
+ * Replace an over-long access or egress walk with an auto ride. The transit in
+ * the middle is untouched - this only changes how the rider reaches and leaves
+ * the network, which is exactly the gap a metro-only pilot network leaves.
+ */
+function toAutoAssisted(j: Journey): Journey | null {
+  const legs: Leg[] = j.legs.map((l) => ({ ...l }));
+  let changed = false;
+
+  const convert = (idx: number) => {
+    const l = legs[idx];
+    if (!l || l.mode !== "WALK") return;
+    const meters = l.walkingMeters ?? 0;
+    if (meters <= AUTO_SWITCH_METERS) return;
+    const km = meters / 1000;
+    const next: Leg = {
+      ...l,
+      mode: "AUTO",
+      routeColor: "#d97706",
+      durationMinutes: AUTO_BOARD_MIN + (km / AUTO_SPEED_KMH) * 60,
+      waitMinutes: AUTO_BOARD_MIN,
+      fareInr: autoFare(km),
+      provenance: "DEMO",
+    };
+    delete next.walkingMeters;
+    legs[idx] = next;
+    changed = true;
+  };
+
+  convert(0);
+  if (legs.length > 1) convert(legs.length - 1);
+  if (!changed) return null;
+
+  // Every time in this planner is sequential, so re-time from the top.
+  const startMs = new Date(j.departAt).getTime();
+  let t = startMs;
+  for (const l of legs) {
+    l.departAt = new Date(t).toISOString();
+    t += l.durationMinutes * 60000;
+    l.arriveAt = new Date(t).toISOString();
+  }
+
+  return {
+    ...j,
+    id: `${j.id}a`,
+    label: "ALTERNATIVE",
+    departAt: legs[0].departAt,
+    arriveAt: legs[legs.length - 1].arriveAt,
+    durationMinutes: (t - startMs) / 60000,
+    fareInr: Math.round(legs.reduce((a, l) => a + (l.fareInr ?? 0), 0)),
+    walkingMeters: Math.round(
+      legs.reduce((a, l) => a + (l.walkingMeters ?? 0), 0),
+    ),
+    legs,
+    provenance: "DEMO",
+  };
+}
+
+/**
+ * What to return when nothing on the network is walkable: an auto to the
+ * nearest boardable stop if that beats riding the whole way, plus the
+ * door-to-door auto itself.
+ */
+function autoOnlyOptions(input: PlanInput, departAtMs: number): Journey[] {
+  const assisted = autoAssistJourneys(input, []);
+  const pure = autoFallback(input.origin, input.destination, departAtMs);
+  const all = [...assisted, ...pure];
+  if (all.length === 0) return [];
+
+  // Same balanced trade-off the main path uses, so a slightly slower but much
+  // cheaper auto+metro option is not buried under a straight auto ride.
+  const score = (j: Journey) => j.durationMinutes + j.fareInr * 0.04;
+  const ranked = [...all].sort((a, b) => score(a) - score(b));
+  const picked = ranked.slice(0, 2).map((j, i) => {
+    if (i === 0) return { ...j, label: "RECOMMENDED" as JourneyLabel };
+    const label: JourneyLabel =
+      j.fareInr < ranked[0].fareInr ? "CHEAPEST" : "ALTERNATIVE";
+    return { ...j, label };
+  });
+  return picked.map((j) => ({ ...j, why: explainJourney(j, picked) }));
+}
+
+/** True when an itinerary makes the rider walk further than we want to ask. */
+function needsAutoAssist(j: Journey): boolean {
+  if (j.walkingMeters > AUTO_ASSIST_TRIGGER_METERS) return true;
+  const ends = [j.legs[0], j.legs[j.legs.length - 1]];
+  return ends.some(
+    (l) =>
+      l !== undefined &&
+      l.mode === "WALK" &&
+      (l.walkingMeters ?? 0) > AUTO_SWITCH_METERS,
+  );
+}
+
+/**
+ * Auto-assisted itineraries: auto for the first/last mile, transit for the
+ * long middle. Re-runs the planner with a much wider connector radius so stops
+ * an auto can reach - but a rider cannot reasonably walk to - become boardable,
+ * then converts those long access walks into auto legs.
+ */
+function autoAssistJourneys(input: PlanInput, existing: Journey[]): Journey[] {
+  if (input.autoAccess) return []; // the wide pass must not recurse
+  const wide = planJourneys({
+    ...input,
+    autoAccess: true,
+    maxWalkMeters: AUTO_ACCESS_MAX_METERS,
+  });
+
+  const seen = new Set(existing.map(legSignature));
+  const out: Journey[] = [];
+  for (const j of wide) {
+    // Skip the pure door-to-door auto: that is the fallback, not an assist.
+    if (j.legs.every((l) => l.mode === "AUTO")) continue;
+    const assisted = toAutoAssisted(j);
+    if (!assisted) continue;
+    const hasTransit = assisted.legs.some(
+      (l) => l.mode === "BUS" || l.mode === "SUBWAY",
+    );
+    const hasAuto = assisted.legs.some((l) => l.mode === "AUTO");
+    if (!hasTransit || !hasAuto) continue;
+    const sig = legSignature(assisted);
+    if (seen.has(sig)) continue;
+    seen.add(sig);
+    out.push(assisted);
+  }
+  out.sort((a, b) => a.durationMinutes - b.durationMinutes);
+  return out.slice(0, 1);
+}
+
 // ------------------------------------------------------------- Public -----
 
 export interface PlanInput {
+  /**
+   * Internal: widen the connector search so an auto can cover the first/last
+   * mile. Set only by the auto-assist pass, which must not recurse.
+   */
+  autoAccess?: boolean;
+  /**
+   * Hard cap on interchanges, from a stated rider constraint (a wheelchair
+   * user, heavy bags, a small child). Applied only when something actually
+   * satisfies it - a preference must never turn a usable answer into none.
+   */
+  maxTransfers?: number;
   origin: Pt & { name: string };
   destination: Pt & { name: string };
   maxWalkMeters?: number;
@@ -614,9 +859,19 @@ export function planJourneys(input: PlanInput): Journey[] {
   const departAtMs = input.departAtMs ?? Date.now();
   const delay = input.delay ?? null;
 
-  const startCandidates = connectorsNear(input.origin, maxWalk);
-  const endCandidates = connectorsNear(input.destination, maxWalk);
-  if (!startCandidates.length || !endCandidates.length) return [];
+  const connectorCap = input.autoAccess
+    ? AUTO_ACCESS_MAX_METERS
+    : CONNECTOR_MAX_METERS;
+  const startCandidates = connectorsNear(input.origin, maxWalk, connectorCap);
+  const endCandidates = connectorsNear(
+    input.destination,
+    maxWalk,
+    connectorCap,
+  );
+  if (!startCandidates.length || !endCandidates.length) {
+    if (input.autoAccess) return [];
+    return autoOnlyOptions(input, departAtMs);
+  }
 
   // Virtual super-source / super-sink via multi-start: run Dijkstra from each
   // candidate (graph is tiny) and take the overall best per profile.
@@ -684,7 +939,10 @@ export function planJourneys(input: PlanInput): Journey[] {
     banPass++;
   }
 
-  if (candidates.length === 0) return [];
+  if (candidates.length === 0) {
+    if (input.autoAccess) return [];
+    return autoOnlyOptions(input, departAtMs);
+  }
 
   // Build full journeys once, then label semantically by actual properties.
   const journeys = candidates
@@ -742,7 +1000,31 @@ export function planJourneys(input: PlanInput): Journey[] {
     }
   }
 
-  return labeled.map((j) => ({ ...j, why: explainJourney(j, labeled) }));
+  // If the walk to or from the network is long, offer an auto-assisted variant
+  // beside it rather than silently asking the rider for a 20-minute walk.
+  const assisted = labeled.some(needsAutoAssist)
+    ? autoAssistJourneys(input, labeled)
+    : [];
+  let finalSet = labeled;
+  if (assisted.length) {
+    finalSet = [...labeled.slice(0, 2), ...assisted].slice(0, 3);
+  }
+
+  // Apply the transfer cap before generating reasons, so comparative claims
+  // ("cheapest") stay true within the set the rider is actually shown.
+  const capped = applyTransferCap(finalSet, input.maxTransfers);
+  return capped.map((j) => ({ ...j, why: explainJourney(j, capped) }));
+}
+
+/**
+ * Keep only itineraries within the rider's stated interchange limit - unless
+ * none qualify, in which case we return everything rather than an empty list
+ * and let the caller tell the rider the constraint could not be met.
+ */
+function applyTransferCap(journeys: Journey[], maxTransfers?: number): Journey[] {
+  if (typeof maxTransfers !== "number") return journeys;
+  const within = journeys.filter((j) => j.transfers <= maxTransfers);
+  return within.length > 0 ? within : journeys;
 }
 
 /**
@@ -751,7 +1033,16 @@ export function planJourneys(input: PlanInput): Journey[] {
  * returned set.
  */
 function explainJourney(j: Journey, all: Journey[]): string[] {
+  // The door-to-door auto fallback carries its own, more specific reasons.
+  if (j.legs.every((l) => l.mode === "AUTO") && j.why?.length) return j.why;
+
   const why: string[] = [];
+  if (
+    j.legs.some((l) => l.mode === "AUTO") &&
+    j.legs.some((l) => l.mode === "BUS" || l.mode === "SUBWAY")
+  ) {
+    why.push("Auto for the first mile, then transit");
+  }
   const minFare = Math.min(...all.map((o) => o.fareInr));
   const minDuration = Math.min(...all.map((o) => o.durationMinutes));
 
@@ -764,20 +1055,22 @@ function explainJourney(j: Journey, all: Journey[]): string[] {
     why.push("Metro skips road traffic");
   }
   if (j.walkingMeters < 300) why.push("Minimal walking");
-  if (typeof minFare !== "number" && j.legs.some((l) => l.mode === "BUS")) {
-    why.push("Live-tracked bus");
-  } else if (j.legs.some((l) => l.mode === "BUS")) {
-    why.push("Includes a live-tracked bus leg");
+  if (j.legs.some((l) => l.mode === "BUS")) {
+    why.push("Includes a bus leg with demo vehicle tracking");
   }
   return why.slice(0, 3);
 }
 
 /** Network stops reachable on foot from an arbitrary point. */
-function connectorsNear(p: Pt, maxWalkMeters: number): StopRef[] {
+function connectorsNear(
+  p: Pt,
+  maxWalkMeters: number,
+  hardCapMeters: number = CONNECTOR_MAX_METERS,
+): StopRef[] {
   const out: { ref: StopRef; d: number }[] = [];
   for (const s of nodeCoords.values()) {
     const d = haversineMeters(p, s);
-    if (d <= Math.min(CONNECTOR_MAX_METERS, maxWalkMeters)) {
+    if (d <= Math.min(hardCapMeters, maxWalkMeters)) {
       out.push({ ref: s, d });
     }
   }

@@ -32,7 +32,7 @@ export async function POST(request: Request) {
   // the primary corridor.
   return NextResponse.json({
     scenario: triggerDisruption(
-      body.routeNumber,
+      typeof body.routeNumber === "string" ? body.routeNumber : undefined,
       typeof body.delayMinutes === "number"
         ? Math.min(60, Math.max(1, Math.round(body.delayMinutes)))
         : 11,

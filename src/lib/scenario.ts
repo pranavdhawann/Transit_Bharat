@@ -3,9 +3,13 @@
  *
  * NORMAL -> (trigger) -> DELAYED -> (recompute journeys) -> ALTERNATIVE
  *
- * State is held in-memory on globalThis so it survives Next.js HMR in dev.
- * It resets on server restart/redeploy - acceptable for the hackathon demo
- * and documented in LIMITATIONS.md.
+ * The authoritative copy lives with the CLIENT, which echoes it back on every
+ * request. Serverless deployments spread requests across instances, so a
+ * server-memory flag set by POST /api/demo/disruption is routinely invisible
+ * to the next POST /api/journeys - the demo would appear to do nothing.
+ *
+ * The in-memory copy on globalThis is kept only as a single-process
+ * convenience (local dev, HMR) and as a fallback when a client sends nothing.
  */
 import { PRIMARY_BUS_NUMBER } from "@/data/network";
 import type { ScenarioState } from "./types";
@@ -35,6 +39,61 @@ export function getScenario(): ScenarioState {
     resetDisruption();
   }
   return { ...store() };
+}
+
+/** Upper bound on a demo delay, also used to validate client input. */
+export const MAX_DELAY_MINUTES = 60;
+
+/**
+ * Validate a scenario echoed back by the client. Untrusted input: every field
+ * is checked and clamped. Returns null if it is not a usable scenario, so the
+ * caller falls back to server state.
+ */
+export function parseScenario(input: unknown): ScenarioState | null {
+  if (typeof input !== "object" || input === null) return null;
+  const raw = input as Record<string, unknown>;
+  if (raw.active !== true) return null;
+  const routeNumber =
+    typeof raw.routeNumber === "string" && raw.routeNumber.length > 0
+      ? raw.routeNumber.slice(0, 12)
+      : null;
+  if (!routeNumber) return null;
+  // Validate before clamping: clamping first would quietly turn a zero or
+  // negative "no delay" payload into a real one-minute disruption.
+  if (
+    typeof raw.delayMinutes !== "number" ||
+    !Number.isFinite(raw.delayMinutes) ||
+    raw.delayMinutes < 1
+  ) {
+    return null;
+  }
+  const delayMinutes = Math.min(
+    MAX_DELAY_MINUTES,
+    Math.round(raw.delayMinutes),
+  );
+  const triggeredAt =
+    typeof raw.triggeredAt === "number" && Number.isFinite(raw.triggeredAt)
+      ? raw.triggeredAt
+      : Date.now();
+  if (Date.now() - triggeredAt > EXPIRE_MS) return null;
+  return { active: true, triggeredAt, routeNumber, delayMinutes };
+}
+
+/**
+ * The scenario to plan against: what the client sent if it is valid, else
+ * whatever this instance happens to remember.
+ */
+export function resolveScenario(clientState?: unknown): ScenarioState {
+  return parseScenario(clientState) ?? getScenario();
+}
+
+/** Delay shape the router and vehicle simulator expect, or null. */
+export function delayFrom(
+  scenario: ScenarioState,
+): { routeNumber: string; minutes: number } | null {
+  return scenario.active && scenario.routeNumber
+    ? { routeNumber: scenario.routeNumber, minutes: scenario.delayMinutes }
+    : null;
 }
 
 export function triggerDisruption(

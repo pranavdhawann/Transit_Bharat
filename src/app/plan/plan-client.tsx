@@ -4,10 +4,18 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import JourneyTimeline from "@/components/JourneyTimeline";
+import LangToggle from "@/components/LangToggle";
 import MapView from "@/components/MapView";
 import RouteCard from "@/components/RouteCard";
 import { fmtAge } from "@/lib/format";
 import { useNow, useVehicles } from "@/lib/hooks";
+import { useLang } from "@/lib/i18n";
+import {
+  loadScenario,
+  saveScenario,
+  scenarioQuery,
+} from "@/lib/scenario-client";
+import type { DisruptionNote } from "@/lib/explain";
 import type { Journey, ScenarioState, Vehicle } from "@/lib/types";
 
 export default function PlanClient() {
@@ -16,13 +24,25 @@ export default function PlanClient() {
   const fromId = params.get("from") ?? "";
   const toId = params.get("to") ?? "";
   const lessWalking = params.get("lessWalk") === "1";
+  const maxTransfersParam = params.get("maxTransfers");
+  const maxTransfers =
+    maxTransfersParam !== null && /^[0-4]$/.test(maxTransfersParam)
+      ? Number(maxTransfersParam)
+      : null;
+  const [lang] = useLang();
   const selParam = params.get("sel");
 
   const [journeys, setJourneys] = useState<Journey[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(selParam);
+  // Seeded from sessionStorage so the delay survives a reload or a trip
+  // through GO mode; the server is stateless about it by design.
   const [scenario, setScenario] = useState<ScenarioState | null>(null);
+  useEffect(() => {
+    setScenario(loadScenario());
+  }, []);
   const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState<DisruptionNote | null>(null);
 
   const fetchJourneys = useCallback(async () => {
     setError(null);
@@ -30,7 +50,13 @@ export default function PlanClient() {
       const res = await fetch("/api/journeys", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ fromId, toId, lessWalking }),
+        body: JSON.stringify({
+          fromId,
+          toId,
+          lessWalking,
+          ...(maxTransfers !== null ? { maxTransfers } : {}),
+          scenario: loadScenario(),
+        }),
       });
       if (!res.ok) throw new Error("planning failed");
       const data = (await res.json()) as {
@@ -39,11 +65,12 @@ export default function PlanClient() {
       };
       setJourneys(data.journeys);
       setScenario(data.scenario);
+      saveScenario(data.scenario);
       setSelectedId((cur) => cur ?? data.journeys[0]?.id ?? null);
     } catch {
       setError("Could not plan a route between these places.");
     }
-  }, [fromId, toId, lessWalking]);
+  }, [fromId, toId, lessWalking, maxTransfers]);
 
   useEffect(() => {
     void fetchJourneys();
@@ -75,7 +102,7 @@ export default function PlanClient() {
     ];
     return nums.length ? nums : null;
   }, [selected]);
-  const vehicles = useVehicles(busRoutes);
+  const vehicles = useVehicles(busRoutes, 4000, scenarioQuery(scenario));
 
   // Deterministically track the vehicle nearest the first boarding stop.
   const trackedVehicle = useMemo(() => {
@@ -98,15 +125,17 @@ export default function PlanClient() {
   async function triggerDisruption() {
     setBusy(true);
     try {
-      await fetch("/api/demo/disruption", {
+      const res = await fetch("/api/demo/disruption", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           action: "trigger",
-          routeNumber: "520",
           delayMinutes: 11,
         }),
       });
+      const data = (await res.json()) as { scenario: ScenarioState };
+      saveScenario(data.scenario);
+      setScenario(data.scenario);
       setSelectedId(null);
       await fetchJourneys();
     } finally {
@@ -122,6 +151,8 @@ export default function PlanClient() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "reset" }),
       });
+      saveScenario(null);
+      setScenario(null);
       setSelectedId(null);
       await fetchJourneys();
     } finally {
@@ -140,6 +171,39 @@ export default function PlanClient() {
     if (lessWalking) qs.set("lessWalk", "1");
     router.push("/go?" + qs.toString());
   }
+
+  // Plain-language explanation of the delay, phrased by the model from the
+  // planner's own numbers. Never blocks the cards from rendering.
+  useEffect(() => {
+    const disrupted = journeys?.find((j) => j.disrupted);
+    const alternative = journeys?.find((j) => !j.disrupted);
+    if (!scenario?.active || !disrupted || !alternative) {
+      setNote(null);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch("/api/ai/disruption-note", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            disrupted,
+            alternative,
+            scenario: loadScenario(),
+          }),
+        });
+        if (!res.ok) return;
+        const data = (await res.json()) as DisruptionNote;
+        if (!cancelled) setNote(data);
+      } catch {
+        // The cards already say everything essential; the note is additive.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [journeys, scenario]);
 
   if (!fromId || !toId) {
     return (
@@ -172,6 +236,9 @@ export default function PlanClient() {
         </Link>
         <h1 className="text-lg font-semibold tracking-tight">Route options</h1>
         <div className="ml-auto flex items-center gap-2">
+          {/* The disruption note below is bilingual, so the rider needs the
+              switch on this page and not only on the home screen. */}
+          <LangToggle />
           {scenario?.active ? (
             <>
               <span className="rounded-full border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-700">
@@ -180,7 +247,7 @@ export default function PlanClient() {
               <button
                 onClick={() => void resetDemo()}
                 disabled={busy}
-                className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium shadow-sm hover:bg-slate-50 disabled:opacity-50"
+                className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium shadow-sm hover:bg-slate-50 disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-600"
               >
                 Reset demo
               </button>
@@ -189,13 +256,27 @@ export default function PlanClient() {
             <button
               onClick={() => void triggerDisruption()}
               disabled={busy}
-              className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium shadow-sm hover:bg-slate-50 disabled:opacity-50"
+              className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium shadow-sm hover:bg-slate-50 disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-600"
             >
               Simulate delay (demo)
             </button>
           )}
         </div>
       </div>
+
+      {note && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
+          <p className="text-sm leading-relaxed text-amber-900">
+            {lang === "hi" ? note.hi : note.en}
+          </p>
+          <p className="mt-2 text-xs text-amber-700">
+            {note.source === "openai"
+              ? `Wording by ${note.model ?? "OpenAI"}${note.latencyMs !== null ? ` · ${note.latencyMs} ms` : ""}`
+              : `Wording from the built-in template${note.fallbackReason ? ` · ${note.fallbackReason}` : ""}`}
+            {" · times and fares from the deterministic planner"}
+          </p>
+        </div>
+      )}
 
       {error && (
         <p className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">

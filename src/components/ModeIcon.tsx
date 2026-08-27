@@ -2,6 +2,7 @@ import type { Mode } from "@/lib/types";
 
 const LABEL: Record<Mode, string> = {
   WALK: "Walk",
+  AUTO: "Auto",
   BUS: "Bus",
   SUBWAY: "Metro",
 };
@@ -40,6 +41,16 @@ export default function ModeIcon({
           <circle cx="13" cy="4.5" r="2" />
           <path d="M10 21l2-6-2-3 3-4 3 3h3" />
           <path d="M12 12l-3 2-1 7" />
+        </>
+      )}
+      {mode === "AUTO" && (
+        <>
+          <path d="M4 15v-3c0-3.9 3.6-7 8-7s8 3.1 8 7v3" />
+          <path d="M4 15h16" />
+          <path d="M12 5v10" />
+          <circle cx="5" cy="17.5" r="2" />
+          <circle cx="19" cy="17.5" r="2" />
+          <circle cx="12" cy="20" r="1.75" />
         </>
       )}
       {mode === "BUS" && (

@@ -2,27 +2,40 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import LangToggle from "@/components/LangToggle";
 import PlaceInput from "@/components/PlaceInput";
 import ProvenanceBadge from "@/components/ProvenanceBadge";
+import { constraintsFor, type PreferencesResult } from "@/lib/ai";
 import { t, useLang } from "@/lib/i18n";
 import { SUGGESTED_PAIRS } from "@/lib/places";
 import type { PlaceResult } from "@/lib/types";
 
-interface PrefsResponse {
-  originText: string | null;
-  destinationText: string | null;
-  walkingPreference: "LOW" | "MEDIUM" | "HIGH" | null;
-  arriveByTime: string | null;
-  source: "openai" | "heuristic";
-  error?: string;
-}
+type PrefsResponse = PreferencesResult & { error?: string };
+
+/** Rider-facing wording for each reason the model call did not happen. */
+const FALLBACK_COPY: Record<string, string> = {
+  no_api_key: "no OpenAI key configured",
+  timeout: "OpenAI timed out",
+  http_error: "OpenAI rejected the request",
+  empty_response: "OpenAI returned nothing",
+  invalid_json: "OpenAI returned unreadable output",
+  network_error: "could not reach OpenAI",
+};
+
+const NEED_COPY: Record<string, string> = {
+  WHEELCHAIR: "wheelchair access",
+  HEAVY_LUGGAGE: "heavy luggage",
+  WITH_CHILD: "travelling with a child",
+  SENIOR: "senior traveller",
+};
 
 export default function HomePage() {
   const router = useRouter();
-  const [lang, setLang] = useLang();
+  const [lang] = useLang();
   const [from, setFrom] = useState<PlaceResult | null>(null);
   const [to, setTo] = useState<PlaceResult | null>(null);
   const [lessWalking, setLessWalking] = useState(false);
+  const [maxTransfers, setMaxTransfers] = useState<number | null>(null);
   const [nlText, setNlText] = useState("");
   const [nlBusy, setNlBusy] = useState(false);
   const [nlNote, setNlNote] = useState<string | null>(null);
@@ -31,6 +44,7 @@ export default function HomePage() {
     if (!f || !t) return;
     const params = new URLSearchParams({ from: f.id, to: t.id });
     if (lessWalking) params.set("lessWalk", "1");
+    if (maxTransfers !== null) params.set("maxTransfers", String(maxTransfers));
     router.push(`/plan?${params.toString()}`);
   }
 
@@ -72,17 +86,41 @@ export default function HomePage() {
       ]);
       if (f) setFrom(f);
       if (t) setTo(t);
-      if (prefs.walkingPreference === "LOW") setLessWalking(true);
+
+      // A stated access need becomes real routing constraints, not a label.
+      const constraints = constraintsFor(prefs);
+      if (constraints.lessWalking) setLessWalking(true);
+      setMaxTransfers(constraints.maxTransfers);
 
       const parts: string[] = [];
-      if (!f && !t) parts.push("couldn't find those places — try the search boxes");
-      else {
-        if (prefs.source === "openai") parts.push("parsed with OpenAI");
-        else parts.push("parsed locally (heuristic mode)");
-        if (!f || !t) parts.push("fill in the missing box");
-        if (prefs.arriveByTime)
-          parts.push(`deadline ${prefs.arriveByTime} noted (arrive-by coming soon)`);
+      if (prefs.source === "openai") {
+        parts.push(
+          `parsed with ${prefs.model ?? "OpenAI"}${prefs.latencyMs !== null ? ` in ${prefs.latencyMs} ms` : ""}`,
+        );
+      } else {
+        // Say WHY, every time. A silent fallback looks identical to success.
+        const why = prefs.fallbackReason
+          ? (FALLBACK_COPY[prefs.fallbackReason] ?? prefs.fallbackReason)
+          : "heuristic mode";
+        parts.push(`parsed locally — ${why}`);
       }
+      if (!f && !t) parts.push("couldn't find those places — try the search boxes");
+      else if (!f || !t) parts.push("fill in the missing box");
+      if (prefs.accessibilityNeed) {
+        parts.push(
+          `${NEED_COPY[prefs.accessibilityNeed] ?? "access need"} — less walking${
+            constraints.maxTransfers !== null
+              ? `, max ${constraints.maxTransfers} change${constraints.maxTransfers === 1 ? "" : "s"}`
+              : ""
+          }`,
+        );
+      } else if (constraints.maxTransfers !== null) {
+        parts.push(
+          `max ${constraints.maxTransfers} change${constraints.maxTransfers === 1 ? "" : "s"}`,
+        );
+      }
+      if (prefs.arriveByTime)
+        parts.push(`deadline ${prefs.arriveByTime} noted (arrive-by coming soon)`);
       setNlNote(parts.join(" · "));
     } catch {
       setNlNote("Could not parse that — please use the search boxes.");
@@ -94,20 +132,7 @@ export default function HomePage() {
   return (
     <div className="space-y-8">
       <section className="relative rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-10">
-        <div className="absolute right-4 top-4 flex overflow-hidden rounded-lg border border-slate-200" role="group" aria-label="Language">
-          {(["en", "hi"] as const).map((l) => (
-            <button
-              key={l}
-              onClick={() => setLang(l)}
-              aria-pressed={lang === l}
-              className={`px-2.5 py-1 text-xs font-semibold ${
-                lang === l ? "bg-slate-900 text-white" : "bg-white text-slate-500 hover:bg-slate-50"
-              }`}
-            >
-              {l === "en" ? "EN" : "हिं"}
-            </button>
-          ))}
-        </div>
+        <LangToggle className="absolute right-4 top-4" />
         <h1 className="text-2xl font-bold tracking-tight sm:text-4xl">
           {t(lang, "heroTitle1")}{" "}
           <span className="text-orange-600">{t(lang, "heroTitle2")}</span>.

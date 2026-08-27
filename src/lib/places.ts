@@ -4,6 +4,7 @@ import {
   METRO_LINES,
   allStops,
 } from "@/data/network";
+import { haversineMeters } from "./geo";
 import type { PlaceResult } from "./types";
 
 interface PlaceRecord extends PlaceResult {
@@ -92,10 +93,33 @@ function norm(s: string): string {
     .trim();
 }
 
+/**
+ * Every query token must appear in the haystack (name + aliases). Lets
+ * "du north" find Delhi University North Campus and "nehru place market"
+ * find the tech market, which single-substring matching cannot do.
+ * Returns 0 (no match) or a 0..1 quality score.
+ */
+function tokenScore(haystack: string, tokens: string[]): number {
+  const words = haystack.split(" ").filter(Boolean);
+  let total = 0;
+  for (const t of tokens) {
+    let best = 0;
+    for (const w of words) {
+      if (w === t) best = Math.max(best, 3);
+      else if (w.startsWith(t)) best = Math.max(best, 2);
+      else if (w.includes(t)) best = Math.max(best, 1);
+    }
+    if (best === 0) return 0;
+    total += best;
+  }
+  return total / (tokens.length * 3);
+}
+
 export function searchPlaces(query: string, limit = 8): PlaceResult[] {
   index ??= buildIndex();
   const q = norm(query);
   if (q.length < 2) return [];
+  const tokens = q.split(" ").filter(Boolean);
 
   const scored = index.map((rec) => {
     const nameN = norm(rec.name);
@@ -114,22 +138,77 @@ export function searchPlaces(query: string, limit = 8): PlaceResult[] {
         }
       }
     }
+    if (score === 0 && tokens.length > 1) {
+      const hay = [nameN, ...rec.aliases.map(norm)].join(" ");
+      const ts = tokenScore(hay, tokens);
+      if (ts > 0) score = 40 + Math.round(ts * 25);
+    }
     return { rec, score };
   });
 
-  return scored
+  const ranked = scored
     .filter((s) => s.score > 0)
     .sort(
       (a, b) =>
         b.score - a.score ||
+        // A landmark we added on top of a real station is the weaker entry:
+        // the station carries its line name, which is what a rider needs.
+        rank(a.rec.type) - rank(b.rec.type) ||
         a.rec.sortKey.length - b.rec.sortKey.length ||
         a.rec.sortKey.localeCompare(b.rec.sortKey),
-    )
-    .slice(0, limit)
-    .map(({ rec }) => {
-      const { aliases: _a, sortKey: _k, ...rest } = rec;
-      return rest;
-    });
+    );
+
+  // Collapse the same place appearing as both a landmark and a station.
+  const kept: typeof ranked = [];
+  for (const s of ranked) {
+    const dup = kept.some(
+      (k) =>
+        norm(k.rec.name) === norm(s.rec.name) &&
+        haversineMeters(k.rec, s.rec) < 800,
+    );
+    if (!dup) kept.push(s);
+    if (kept.length >= limit) break;
+  }
+
+  return kept.map(({ rec }) => {
+    const { aliases: _a, sortKey: _k, ...rest } = rec;
+    return rest;
+  });
+}
+
+/** Station beats landmark beats bus stop when scores tie. */
+function rank(type: PlaceResult["type"]): number {
+  return type === "station" ? 0 : type === "landmark" ? 1 : 2;
+}
+
+/**
+ * Landmarks offered the moment a location field is focused, before the rider
+ * has typed anything. Ordered by how likely they are to be a real trip end in
+ * the pilot area, not alphabetically. Ids are resolved through the index at
+ * call time so a rename in network.ts drops the suggestion rather than
+ * producing a broken option.
+ */
+const POPULAR_PLACE_IDS = [
+  "lm:connaught-place",
+  "lm:new-delhi-railway",
+  "lm:chandni-chowk",
+  "lm:kashmere-gate-isbt",
+  "lm:india-gate",
+  "lm:aiims-hospital",
+  "lm:saket-citywalk",
+  "lm:nehru-place-market",
+];
+
+/** Suggestions for an empty location field. */
+export function suggestedPlaces(limit = 6): PlaceResult[] {
+  index ??= buildIndex();
+  const out: PlaceResult[] = [];
+  for (const id of POPULAR_PLACE_IDS) {
+    if (out.length >= limit) break;
+    const place = getPlace(id);
+    if (place) out.push(place);
+  }
+  return out;
 }
 
 /** Popular demo origin/destination pairs shown as chips on the home screen. */

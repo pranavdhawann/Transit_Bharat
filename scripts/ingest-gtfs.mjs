@@ -3,7 +3,7 @@
  * Transit Bharat - GTFS ingestion, validation & network generation.
  *
  * Reads the official Delhi Open Transit Data GTFS-style snapshots (downloaded
- * from the MobilityData mirror of the official feed - see DATA_SOURCES.md),
+ * from the MobilityData mirror of the official feed - see LIMITATIONS.md),
  * validates them, and generates the compact network files the app consumes:
  *
  *   src/data/generated/metro-lines.json    DMRC lines derived from real data

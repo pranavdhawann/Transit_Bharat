@@ -90,7 +90,7 @@ export default function RouteCard({
           ? transitLegs
               .map(
                 (l) =>
-                  `${l.mode === "BUS" ? "Bus" : "Metro"} ${l.from.name} → ${l.to.name}`,
+                  `${l.mode === "BUS" ? "Bus" : l.mode === "AUTO" ? "Auto" : "Metro"} ${l.from.name} → ${l.to.name}`,
               )
               .join(" · ")
           : "Walking only"}

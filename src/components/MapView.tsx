@@ -20,21 +20,23 @@ interface MapViewProps {
 function legsToGeojson(legs: Leg[]) {
   return {
     type: "FeatureCollection" as const,
-    features: legs.map((leg) => ({
-      type: "Feature" as const,
-      properties: {
-        color: leg.mode === "WALK" ? "#64748b" : (leg.routeColor ?? "#2563eb"),
-        kind: leg.mode === "WALK" ? "walk" : "transit",
-        name:
-          leg.mode === "WALK"
-            ? "Walk"
-            : `${leg.routeNumber ?? ""} ${leg.routeName ?? ""}`.trim(),
-      },
-      geometry: {
-        type: "LineString" as const,
-        coordinates: leg.polyline.map(([lat, lon]) => [lon, lat] as [number, number]),
-      },
-    })),
+    features: legs
+      .map((leg) => ({
+        type: "Feature" as const,
+        properties: {
+          color: leg.mode === "WALK" ? "#64748b" : (leg.routeColor ?? "#2563eb"),
+          kind: leg.mode === "WALK" ? "walk" : "transit",
+          name:
+            leg.mode === "WALK"
+              ? "Walk"
+              : `${leg.routeNumber ?? ""} ${leg.routeName ?? ""}`.trim(),
+        },
+        geometry: {
+          type: "LineString" as const,
+          coordinates: leg.polyline.map(([lat, lon]) => [lon, lat] as [number, number]),
+        },
+      }))
+      .filter((f) => f.geometry.coordinates.length >= 2),
   };
 }
 
@@ -90,7 +92,14 @@ export default function MapView({
     next: Vehicle[];
     t0: number;
   } | null>(null);
-  const [ready, setReady] = useState(false);
+  // Bumped on every successful style load. A plain boolean cannot tell
+  // "map A is ready" from "map B is ready": under StrictMode React remounts,
+  // so map A loads (ready=true), gets removed, and map B's load sets ready to
+  // true again - an identical value, so no re-render happens and the effects
+  // that push route/stop data never re-run against map B. The route silently
+  // never gets drawn. An epoch always changes, so they always re-run.
+  const [mapEpoch, setMapEpoch] = useState(0);
+  const ready = mapEpoch > 0;
   const [tilesFailed, setTilesFailed] = useState(false);
   const styleLoadedRef = useRef(false);
 
@@ -123,7 +132,7 @@ export default function MapView({
           mapRef.current?.setStyle(
             "https://tiles.openfreemap.org/styles/positron",
           );
-        } else if (styleLoadedRef.current) {
+        } else if (!tilesFailed) {
           setTilesFailed(true);
         }
       });
@@ -194,7 +203,7 @@ export default function MapView({
           },
         });
 
-        setReady(true);
+        setMapEpoch((e) => e + 1);
       });
     })();
 
@@ -202,6 +211,7 @@ export default function MapView({
       cancelled = true;
       map?.remove();
       mapRef.current = null;
+      setMapEpoch(0);
     };
   }, []);
 
@@ -254,6 +264,11 @@ export default function MapView({
     map.on("mouseleave", "tb-vehicle-dot", onLeave);
 
     return () => {
+      // React runs cleanups in declaration order, so the init effect above has
+      // already called map.remove() by the time we get here on unmount. A
+      // removed map has no .style, and every getLayer/off call throws. remove()
+      // drops its own listeners anyway, so there is nothing left to detach.
+      if (mapRef.current !== map) return;
       map.off("click", onClick);
       if (map.getLayer("tb-stop-dot")) {
         map.off("mouseenter", "tb-stop-dot", onEnter);
@@ -264,7 +279,7 @@ export default function MapView({
         map.off("mouseleave", "tb-vehicle-dot", onLeave);
       }
     };
-  }, [ready]);
+  }, [mapEpoch]);
 
   // Route + stop data.
   useEffect(() => {
@@ -276,7 +291,7 @@ export default function MapView({
     (map.getSource("tb-stops") as GeoJSONSource | undefined)?.setData(
       stopsGeojson(legs),
     );
-  }, [ready, legs]);
+  }, [mapEpoch, legs]);
 
   // Vehicle positions - smoothly interpolated between poll snapshots.
   useEffect(() => {
@@ -331,7 +346,7 @@ export default function MapView({
     cancelAnimationFrame(raf);
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [ready, vehicles, highlightVehicleId]);
+  }, [mapEpoch, vehicles, highlightVehicleId]);
 
   // Fit bounds when route data changes.
   useEffect(() => {
@@ -364,7 +379,7 @@ export default function MapView({
         essential: true,
       },
     );
-  }, [ready, legs]);
+  }, [mapEpoch, legs]);
 
   return (
     <div

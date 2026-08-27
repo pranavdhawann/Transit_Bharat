@@ -56,7 +56,7 @@ deliberately (v6 is ESM-only/WebGL2 - migration noted, not needed).
 ```bash
 npm install
 npm run typecheck   # tsc --noEmit - clean
-npm test            # vitest - 20/20 green (provenance, router, vehicles, ai)
+npm test            # vitest - 22/22 green (provenance, router, vehicles, ai)
 npm run build       # production build - clean
 node scripts/ingest-gtfs.mjs   # validation report regenerated
 ```
@@ -64,6 +64,6 @@ node scripts/ingest-gtfs.mjs   # validation report regenerated
 ## What was NOT done by the agent
 
 - Product strategy, hackathon research docs and video script came from the
-  pre-existing planning documents in this repo (`Transit_Bharat_01..03`),
+  pre-existing planning documents (since consolidated away),
   authored before the build sessions.
 - Final recorded demo, deployment and user testing remain human tasks.
