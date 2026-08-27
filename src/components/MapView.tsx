@@ -385,9 +385,11 @@ export default function MapView({
     <div
       className={`relative overflow-hidden rounded-xl border border-slate-200 ${className}`}
     >
+      {/* MapLibre changes this node to position:relative. An explicit inherited
+          height keeps its canvas from collapsing to 0 px inside the wrapper. */}
       <div
         ref={containerRef}
-        className="absolute inset-0"
+        className="h-full w-full"
         aria-label="Journey map"
         role="application"
       />

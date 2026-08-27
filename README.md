@@ -45,9 +45,10 @@ answer is "this is demo data".
 
 ## The citizen journey (what reviewers should try)
 
-1. **Search.** Tap the **From** box — popular places appear before you type.
-   Type `chandni`, `du north`, `saket`, or `लाजपत नगर`. 390 searchable places:
-   242 metro stations, 67 bus stops, 81 landmarks, with Hindi aliases.
+1. **Search.** Tap **Use current location** in the **From** box, or focus either
+   box to browse popular places. Type `chandni`, `du north`, `saket`, or
+   `लाजपत नगर`. 390 searchable places: 242 metro stations, 67 bus stops, 81
+   landmarks, with Hindi aliases.
 2. **Compare.** **Find my route** → up to three options labelled
    *Recommended / Fastest / Cheapest*, each with time, fare, transfers,
    walking distance, a trust badge, and deterministic "why" reasons.

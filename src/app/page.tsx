@@ -6,6 +6,10 @@ import LangToggle from "@/components/LangToggle";
 import PlaceInput from "@/components/PlaceInput";
 import ProvenanceBadge from "@/components/ProvenanceBadge";
 import { constraintsFor, type PreferencesResult } from "@/lib/ai";
+import {
+  currentLocationPlace,
+  saveCurrentLocation,
+} from "@/lib/current-location";
 import { t, useLang } from "@/lib/i18n";
 import { SUGGESTED_PAIRS } from "@/lib/places";
 import type { PlaceResult } from "@/lib/types";
@@ -39,6 +43,9 @@ export default function HomePage() {
   const [nlText, setNlText] = useState("");
   const [nlBusy, setNlBusy] = useState(false);
   const [nlNote, setNlNote] = useState<string | null>(null);
+  const [locationBusy, setLocationBusy] = useState(false);
+  const [locationMessage, setLocationMessage] = useState<string | null>(null);
+  const [locationError, setLocationError] = useState(false);
 
   function go(f: PlaceResult | null, t: PlaceResult | null) {
     if (!f || !t) return;
@@ -46,6 +53,58 @@ export default function HomePage() {
     if (lessWalking) params.set("lessWalk", "1");
     if (maxTransfers !== null) params.set("maxTransfers", String(maxTransfers));
     router.push(`/plan?${params.toString()}`);
+  }
+
+  function clearLocationStatus() {
+    setLocationBusy(false);
+    setLocationMessage(null);
+    setLocationError(false);
+  }
+
+  function selectFrom(place: PlaceResult | null) {
+    setFrom(place);
+    if (place?.type !== "current") clearLocationStatus();
+  }
+
+  function useCurrentLocation() {
+    if (!navigator.geolocation) {
+      setLocationError(true);
+      setLocationMessage("Current location is not supported by this browser.");
+      return;
+    }
+    setLocationBusy(true);
+    setLocationError(false);
+    setLocationMessage("Finding your current location…");
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const place = currentLocationPlace(position.coords);
+        if (!saveCurrentLocation(place)) {
+          setLocationBusy(false);
+          setLocationError(true);
+          setLocationMessage(
+            "Your browser blocked temporary location storage. Allow site storage and try again.",
+          );
+          return;
+        }
+        setFrom(place);
+        setLocationBusy(false);
+        setLocationMessage(place.detail ?? "Current location ready.");
+      },
+      (error) => {
+        const message =
+          error.code === error.PERMISSION_DENIED
+            ? "Location access was denied. Allow it in your browser settings and try again."
+            : error.code === error.POSITION_UNAVAILABLE
+              ? "Your current location is unavailable. Check location services and try again."
+              : error.code === error.TIMEOUT
+                ? "Finding your location timed out. Try again."
+                : "Could not read your current location. Try again.";
+        setLocationBusy(false);
+        setLocationError(true);
+        setLocationMessage(message);
+      },
+      { enableHighAccuracy: true, timeout: 10_000, maximumAge: 60_000 },
+    );
   }
 
   async function applyPair(fromId: string, toId: string) {
@@ -58,6 +117,7 @@ export default function HomePage() {
       const tData = (await tRes.json()) as { place: PlaceResult | null };
       setFrom(fData.place);
       setTo(tData.place);
+      clearLocationStatus();
     })();
   }
 
@@ -84,7 +144,10 @@ export default function HomePage() {
         resolve(prefs.originText),
         resolve(prefs.destinationText),
       ]);
-      if (f) setFrom(f);
+      if (f) {
+        setFrom(f);
+        clearLocationStatus();
+      }
       if (t) setTo(t);
 
       // A stated access need becomes real routing constraints, not a label.
@@ -152,8 +215,12 @@ export default function HomePage() {
               label="From"
               placeholder="Start point — e.g. Munirka"
               value={from}
-              onSelect={setFrom}
+              onSelect={selectFrom}
               iconColor="bg-emerald-500"
+              onUseCurrentLocation={useCurrentLocation}
+              locationBusy={locationBusy}
+              locationMessage={locationMessage}
+              locationError={locationError}
             />
             <button
               type="button"
@@ -161,6 +228,7 @@ export default function HomePage() {
               onClick={() => {
                 setFrom(to);
                 setTo(from);
+                clearLocationStatus();
               }}
               className="absolute right-2 top-1/2 z-10 hidden h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full border border-slate-300 bg-white shadow-sm hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-blue-600 sm:flex"
             >

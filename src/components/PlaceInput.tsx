@@ -17,6 +17,10 @@ export default function PlaceInput({
   value,
   onSelect,
   iconColor = "bg-slate-400",
+  onUseCurrentLocation,
+  locationBusy = false,
+  locationMessage = null,
+  locationError = false,
 }: {
   id: string;
   label: string;
@@ -24,6 +28,10 @@ export default function PlaceInput({
   value: PlaceResult | null;
   onSelect: (p: PlaceResult | null) => void;
   iconColor?: string;
+  onUseCurrentLocation?: () => void;
+  locationBusy?: boolean;
+  locationMessage?: string | null;
+  locationError?: boolean;
 }) {
   const [text, setText] = useState("");
   const [results, setResults] = useState<PlaceResult[]>([]);
@@ -205,7 +213,27 @@ export default function PlaceInput({
             &times;
           </button>
         )}
+        {onUseCurrentLocation && text.length === 0 && (
+          <button
+            type="button"
+            onClick={onUseCurrentLocation}
+            disabled={locationBusy}
+            aria-label={`Use current location for ${label}`}
+            className="shrink-0 rounded-lg px-2 py-1 text-xs font-semibold text-blue-700 hover:bg-blue-50 focus-visible:outline-2 focus-visible:outline-blue-600 disabled:cursor-wait disabled:opacity-60"
+          >
+            {locationBusy ? "Locating…" : "Use current location"}
+          </button>
+        )}
       </div>
+
+      {locationMessage && (
+        <p
+          role="status"
+          className={`mt-1 px-1 text-xs ${locationError ? "text-red-700" : "text-slate-500"}`}
+        >
+          {locationMessage}
+        </p>
+      )}
 
       {open && (results.length > 0 || showEmptyState) && (
         <div className="absolute z-20 mt-1 w-full overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg">

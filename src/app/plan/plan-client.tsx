@@ -8,6 +8,7 @@ import LangToggle from "@/components/LangToggle";
 import MapView from "@/components/MapView";
 import RouteCard from "@/components/RouteCard";
 import { fmtAge } from "@/lib/format";
+import { journeyEndpointFor } from "@/lib/current-location";
 import { useNow, useVehicles } from "@/lib/hooks";
 import { useLang } from "@/lib/i18n";
 import {
@@ -46,13 +47,26 @@ export default function PlanClient() {
 
   const fetchJourneys = useCallback(async () => {
     setError(null);
+    const fromEndpoint = journeyEndpointFor(fromId);
+    const toEndpoint = journeyEndpointFor(toId);
+    if (!fromEndpoint || !toEndpoint) {
+      setJourneys([]);
+      setError(
+        "Your current location is no longer available. Go back and select it again.",
+      );
+      return;
+    }
     try {
       const res = await fetch("/api/journeys", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          fromId,
-          toId,
+          ...(fromEndpoint.location
+            ? { fromLocation: fromEndpoint.location }
+            : { fromId: fromEndpoint.id }),
+          ...(toEndpoint.location
+            ? { toLocation: toEndpoint.location }
+            : { toId: toEndpoint.id }),
           lessWalking,
           ...(maxTransfers !== null ? { maxTransfers } : {}),
           scenario: loadScenario(),
