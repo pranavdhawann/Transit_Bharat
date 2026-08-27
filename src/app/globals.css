@@ -140,6 +140,43 @@ body {
   box-shadow: var(--seg-keyline-dark, none);
 }
 
+/* ------------------------------------------------------ timeline-bullet /
+   timeline-spine
+   JourneyTimeline's leg bullet and connector spine (spec section 5.3).
+   Same defect and same fix as .route-seg above: leg.routeColor only ever
+   carries the LIGHT base, so JourneyTimeline.tsx hands each bullet and
+   spine both its light and dark resolution as custom properties, and these
+   rules pick the right one with the identical three-way pattern — no
+   dark: variant, this project doesn't use one. */
+.timeline-bullet {
+  background-color: var(--tl-bullet-bg);
+  color: var(--tl-bullet-fg);
+}
+
+.timeline-spine {
+  background-color: var(--tl-spine);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .timeline-bullet {
+    background-color: var(--tl-bullet-bg-dark);
+    color: var(--tl-bullet-fg-dark);
+  }
+
+  :root:not([data-theme="light"]) .timeline-spine {
+    background-color: var(--tl-spine-dark);
+  }
+}
+
+:root[data-theme="dark"] .timeline-bullet {
+  background-color: var(--tl-bullet-bg-dark);
+  color: var(--tl-bullet-fg-dark);
+}
+
+:root[data-theme="dark"] .timeline-spine {
+  background-color: var(--tl-spine-dark);
+}
+
 /* MapLibre popup styling to match the design system */
 .maplibregl-popup-content {
   border-radius: 2px !important;

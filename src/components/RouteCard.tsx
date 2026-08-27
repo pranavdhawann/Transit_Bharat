@@ -2,14 +2,14 @@
 
 import { fmtDurationMinutes, fmtInr, fmtWalk } from "@/lib/format";
 import type { Journey } from "@/lib/types";
-import ModeIcon, { modeLabel } from "./ModeIcon";
+import RouteBar from "./RouteBar";
 import ProvenanceBadge from "./ProvenanceBadge";
 
 const LABEL_STYLES: Record<string, string> = {
-  RECOMMENDED: "bg-blue-600 text-white",
-  FASTEST: "bg-slate-900 text-white",
-  CHEAPEST: "bg-emerald-600 text-white",
-  ALTERNATIVE: "bg-amber-500 text-white",
+  RECOMMENDED: "bg-ink text-paper",
+  FASTEST: "border border-ink text-ink",
+  CHEAPEST: "border border-ink text-ink",
+  ALTERNATIVE: "border border-rule text-ink-3",
 };
 
 export default function RouteCard({
@@ -27,22 +27,22 @@ export default function RouteCard({
       type="button"
       onClick={() => onSelect(journey.id)}
       aria-pressed={selected}
-      className={`bt-animate block w-full rounded-2xl border bg-white p-4 text-left shadow-sm transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 ${
+      className={`bt-animate block w-full border-l-[3px] bg-surface p-4 text-left transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-saffron ${
         selected
-          ? "border-blue-600 ring-2 ring-blue-100"
-          : "border-slate-200 hover:border-slate-300 hover:shadow"
+          ? "border-l-saffron border-y border-r border-y-ink border-r-ink"
+          : "border-l-transparent border-y border-r border-rule hover:border-l-ink-3"
       }`}
     >
       <div className="flex items-center justify-between gap-2">
         <span
-          className={`rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider ${
+          className={`px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider ${
             LABEL_STYLES[journey.label] ?? LABEL_STYLES.ALTERNATIVE
           }`}
         >
           {journey.label}
         </span>
         {journey.disrupted && (
-          <span className="rounded-full border border-red-200 bg-red-50 px-2 py-0.5 text-[11px] font-semibold text-red-700">
+          <span className="type-micro border border-stale text-stale px-2 py-0.5">
             Delayed +{journey.legs.find((l) => l.delayMinutes)?.delayMinutes} min
           </span>
         )}
@@ -50,42 +50,21 @@ export default function RouteCard({
       </div>
 
       <div className="mt-3 flex items-baseline gap-3">
-        <span className="text-2xl font-bold tracking-tight">
+        <span className="type-data text-2xl">
           {fmtDurationMinutes(journey.durationMinutes)}
         </span>
-        <span className="text-lg font-semibold text-slate-700">
+        <span className="type-data text-lg">
           {fmtInr(journey.fareInr)}
         </span>
-        <span className="ml-auto text-xs text-slate-500">
+        <span className="type-micro ml-auto text-ink-3">
           {journey.transfers} transfer{journey.transfers === 1 ? "" : "s"} ·{" "}
           {fmtWalk(journey.walkingMeters)} walk
         </span>
       </div>
 
-      <div className="mt-3 flex flex-wrap items-center gap-1.5">
-        {journey.legs.map((leg, i) => (
-          <span key={i} className="flex items-center gap-1.5">
-            {i > 0 && <span aria-hidden className="text-slate-300">›</span>}
-            <span
-              className={`inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium ${
-                leg.mode === "WALK"
-                  ? "bg-slate-100 text-slate-700"
-                  : "text-white"
-              }`}
-              style={
-                leg.mode !== "WALK" ? { backgroundColor: leg.routeColor ?? "#2563eb" } : undefined
-              }
-            >
-              <ModeIcon mode={leg.mode} size={13} />
-              {leg.mode === "WALK"
-                ? `${modeLabel("WALK")} ${Math.max(1, Math.round(leg.durationMinutes))}m`
-                : `${leg.routeNumber ?? modeLabel(leg.mode)} · ${Math.round(leg.durationMinutes)}m`}
-            </span>
-          </span>
-        ))}
-      </div>
+      <RouteBar legs={journey.legs} className="mt-3" />
 
-      <p className="mt-2 text-xs text-slate-400">
+      <p className="mt-2 text-xs text-ink-3">
         {transitLegs.length > 0
           ? transitLegs
               .map(
