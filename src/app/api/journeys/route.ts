@@ -6,13 +6,15 @@ import {
 } from "@/data/network";
 import { planJourneys } from "@/lib/graph";
 import { delayFrom, resolveScenario } from "@/lib/scenario";
-import type { Journey } from "@/lib/types";
+import type { Journey, JourneyLocation } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
 interface JourneysRequest {
   fromId?: string;
   toId?: string;
+  fromLocation?: unknown;
+  toLocation?: unknown;
   lessWalking?: boolean;
   /** Interchange cap from a stated accessibility constraint. */
   maxTransfers?: number;
@@ -39,8 +41,10 @@ export async function POST(request: Request) {
 
   const fromId = typeof body.fromId === "string" ? body.fromId : undefined;
   const toId = typeof body.toId === "string" ? body.toId : undefined;
-  const from = resolvePlace(fromId);
-  const to = resolvePlace(toId);
+  const fromLocation = parseLocation(body.fromLocation);
+  const toLocation = parseLocation(body.toLocation);
+  const from = fromLocation ?? resolvePlace(fromId);
+  const to = toLocation ?? resolvePlace(toId);
   if (!from || !to) {
     return NextResponse.json(
       { error: "UNKNOWN_PLACE", message: "Search and pick both places first." },
@@ -67,8 +71,8 @@ export async function POST(request: Request) {
   }).map((j) => ({
     ...j,
     query: {
-      fromId: fromId!,
-      toId: toId!,
+      ...(fromLocation ? { fromLocation } : { fromId: fromId! }),
+      ...(toLocation ? { toLocation } : { toId: toId! }),
       maxWalkMeters: body.lessWalking
         ? LESS_WALK_MAX_METERS
         : DEFAULT_MAX_WALK_METERS,
@@ -91,6 +95,26 @@ function resolvePlace(id?: string) {
   return getPlace(id.trim());
 }
 
-function displayName(p: { name: string; type: string }): string {
+function parseLocation(value: unknown): JourneyLocation | null {
+  if (!value || typeof value !== "object") return null;
+  const candidate = value as Record<string, unknown>;
+  const lat = candidate.lat;
+  const lon = candidate.lon;
+  if (
+    typeof lat !== "number" ||
+    !Number.isFinite(lat) ||
+    lat < -90 ||
+    lat > 90 ||
+    typeof lon !== "number" ||
+    !Number.isFinite(lon) ||
+    lon < -180 ||
+    lon > 180
+  ) {
+    return null;
+  }
+  return { name: "Current location", lat, lon };
+}
+
+function displayName(p: { name: string; type?: string }): string {
   return p.type === "stop" ? p.name.replace(/^Bus:\s*/, "") : p.name;
 }

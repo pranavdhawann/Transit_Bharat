@@ -75,7 +75,12 @@ footer · this file · the README.
 - **"Arrive by" is parsed, not honoured.** The planner is "leave now" only;
   the AI parser may note a deadline but the router does not yet plan backwards
   from it. The UI says so.
-- **Geolocation is deliberately unused** so the demo stays deterministic.
+- **Geolocation is opt-in and session-scoped.** The browser position is used
+  only after the rider taps **Use current location**. Exact coordinates stay in
+  `sessionStorage` and the journey POST body; the URL contains only a
+  `current-location` marker. Consequently, a current-location journey link is
+  not portable to another tab or device, and accuracy depends on the browser
+  and device location services.
 - **Hindi is partial.** Key journey strings, search aliases and the disruption
   explanation are bilingual. The full interface is not.
 

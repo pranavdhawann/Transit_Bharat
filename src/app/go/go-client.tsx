@@ -9,6 +9,7 @@ import MapView from "@/components/MapView";
 import ProvenanceBadge from "@/components/ProvenanceBadge";
 import RouteBar from "@/components/RouteBar";
 import { fmtClockIST, fmtDurationMinutes, fmtWalk } from "@/lib/format";
+import { journeyEndpointFor } from "@/lib/current-location";
 import { useVehicles } from "@/lib/hooks";
 import { loadScenario, scenarioQuery } from "@/lib/scenario-client";
 import type { Journey, Leg, Vehicle } from "@/lib/types";
@@ -50,12 +51,19 @@ export default function GoClient() {
       }
       if (fromId && toId) {
         try {
+          const fromEndpoint = journeyEndpointFor(fromId);
+          const toEndpoint = journeyEndpointFor(toId);
+          if (!fromEndpoint || !toEndpoint) throw new Error("location missing");
           const res = await fetch("/api/journeys", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              fromId,
-              toId,
+              ...(fromEndpoint.location
+                ? { fromLocation: fromEndpoint.location }
+                : { fromId: fromEndpoint.id }),
+              ...(toEndpoint.location
+                ? { toLocation: toEndpoint.location }
+                : { toId: toEndpoint.id }),
               lessWalking: params.get("lessWalk") === "1",
               scenario: loadScenario(),
             }),
@@ -241,7 +249,7 @@ function GoNavigator({ initialJourney }: { initialJourney: Journey }) {
         fromId: "",
         toId: "",
       };
-      if (!q.fromId || !q.toId) return;
+      if (!(q.fromId || q.fromLocation) || !(q.toId || q.toLocation)) return;
       const res = await fetch("/api/journeys", {
         method: "POST",
         headers: { "Content-Type": "application/json" },

@@ -17,6 +17,10 @@ export default function PlaceInput({
   value,
   onSelect,
   position = "solo",
+  onUseCurrentLocation,
+  locationBusy = false,
+  locationMessage = null,
+  locationError = false,
 }: {
   id: string;
   label: string;
@@ -24,6 +28,10 @@ export default function PlaceInput({
   value: PlaceResult | null;
   onSelect: (p: PlaceResult | null) => void;
   position?: "top" | "bottom" | "solo";
+  onUseCurrentLocation?: () => void;
+  locationBusy?: boolean;
+  locationMessage?: string | null;
+  locationError?: boolean;
 }) {
   const [text, setText] = useState("");
   const [results, setResults] = useState<PlaceResult[]>([]);
@@ -216,7 +224,27 @@ export default function PlaceInput({
             &times;
           </button>
         )}
+        {onUseCurrentLocation && text.length === 0 && (
+          <button
+            type="button"
+            onClick={onUseCurrentLocation}
+            disabled={locationBusy}
+            aria-label={`Use current location for ${label}`}
+            className="type-micro shrink-0 rounded-[2px] border border-rule bg-paper px-2 py-1 text-ink hover:bg-surface focus-visible:outline-2 focus-visible:outline-saffron disabled:cursor-wait disabled:opacity-60"
+          >
+            {locationBusy ? "Locating…" : "Use current location"}
+          </button>
+        )}
       </div>
+
+      {locationMessage && (
+        <p
+          role="status"
+          className={`mt-1 px-1 text-xs ${locationError ? "text-stale" : "text-ink-3"}`}
+        >
+          {locationMessage}
+        </p>
+      )}
 
       {open && (results.length > 0 || showEmptyState) && (
         <div className="absolute z-20 mt-1 w-full overflow-hidden border border-rule bg-surface">

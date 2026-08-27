@@ -386,6 +386,8 @@ export default function MapView({
     <div
       className={`relative overflow-hidden border border-rule ${className}`}
     >
+      {/* MapLibre changes this node to position:relative. An explicit inherited
+          height keeps its canvas from collapsing to 0 px inside the wrapper. */}
       <div
         ref={containerRef}
         className="h-full w-full"

@@ -11,6 +11,10 @@ export interface LatLng {
   lon: number;
 }
 
+export interface JourneyLocation extends LatLng {
+  name: string;
+}
+
 export interface StopRef {
   id: string;
   name: string;
@@ -48,8 +52,10 @@ export interface Leg {
 export type JourneyLabel = "RECOMMENDED" | "FASTEST" | "CHEAPEST" | "ALTERNATIVE";
 
 export interface JourneyQuery {
-  fromId: string;
-  toId: string;
+  fromId?: string;
+  toId?: string;
+  fromLocation?: JourneyLocation;
+  toLocation?: JourneyLocation;
   maxWalkMeters?: number;
 }
 
@@ -91,7 +97,7 @@ export interface Vehicle {
 export interface PlaceResult {
   id: string;
   name: string;
-  type: "landmark" | "stop" | "station";
+  type: "landmark" | "stop" | "station" | "current";
   lat: number;
   lon: number;
   detail?: string;
