@@ -9,8 +9,14 @@ import MapView from "@/components/MapView";
 import ProvenanceBadge from "@/components/ProvenanceBadge";
 import RouteBar from "@/components/RouteBar";
 import { fmtClockIST, fmtDurationMinutes, fmtWalk } from "@/lib/format";
+import {
+  positionAlongLeg,
+  reanchorAtSpeedChange,
+  simulationTime,
+} from "@/lib/go-navigation";
 import { journeyEndpointFor } from "@/lib/current-location";
 import { useVehicles } from "@/lib/hooks";
+import { enrichJourneyGeometry } from "@/lib/route-geometry-client";
 import { loadScenario, scenarioQuery } from "@/lib/scenario-client";
 import type { Journey, Leg, Vehicle } from "@/lib/types";
 
@@ -41,7 +47,8 @@ export default function GoClient() {
         const raw = sessionStorage.getItem("bt:journey");
         if (raw) {
           const j = JSON.parse(raw) as Journey;
-          if (!cancelled && j?.legs?.length) {
+          const matchesRequest = sel ? j?.id === sel : !fromId && !toId;
+          if (!cancelled && j?.legs?.length && matchesRequest) {
             setJourney(j);
             return;
           }
@@ -65,6 +72,9 @@ export default function GoClient() {
                 ? { toLocation: toEndpoint.location }
                 : { toId: toEndpoint.id }),
               lessWalking: params.get("lessWalk") === "1",
+              ...(params.get("maxTransfers") !== null
+                ? { maxTransfers: Number(params.get("maxTransfers")) }
+                : {}),
               scenario: loadScenario(),
             }),
           });
@@ -134,6 +144,23 @@ function GoNavigator({ initialJourney }: { initialJourney: Journey }) {
     return () => clearInterval(t);
   }, []);
 
+  useEffect(() => {
+    if (journey.legs.every((leg) => leg.geometrySource)) return;
+    const controller = new AbortController();
+    void enrichJourneyGeometry(journey, controller.signal)
+      .then((enriched) => {
+        if (controller.signal.aborted || enriched === journey) return;
+        setJourney(enriched);
+        try {
+          sessionStorage.setItem("bt:journey", JSON.stringify(enriched));
+        } catch {
+          // Navigation still works; only reload persistence is unavailable.
+        }
+      })
+      .catch(() => undefined);
+    return () => controller.abort();
+  }, [journey]);
+
   const boundaries = useMemo<Boundary[]>(
     () =>
       journey.legs.map((leg) => {
@@ -148,7 +175,7 @@ function GoNavigator({ initialJourney }: { initialJourney: Journey }) {
   const jStart = boundaries[0]?.start ?? Date.now();
   const jEnd = boundaries[boundaries.length - 1]?.end ?? jStart;
 
-  const simNow = anchor.sim + (Date.now() - anchor.wall) * speed;
+  const simNow = simulationTime(anchor, Date.now(), speed);
   const clampedNow = Math.min(simNow, jEnd);
 
   const currentIdx = running
@@ -156,6 +183,28 @@ function GoNavigator({ initialJourney }: { initialJourney: Journey }) {
     : -1;
   const arrived = running && clampedNow >= jEnd;
   const current = currentIdx >= 0 ? boundaries[currentIdx] : null;
+  const travellerPosition = current
+    ? {
+        ...positionAlongLeg(
+          current.leg,
+          clampedNow,
+          current.start,
+          current.rideStart,
+          current.end,
+        ),
+        label: "Your simulated position",
+      }
+    : arrived
+      ? {
+          lat: journey.legs[journey.legs.length - 1].to.lat,
+          lon: journey.legs[journey.legs.length - 1].to.lon,
+          label: "Destination",
+        }
+      : {
+          lat: journey.legs[0].from.lat,
+          lon: journey.legs[0].from.lon,
+          label: "Journey start",
+        };
 
   const busRoutes = useMemo(() => {
     const nums = [
@@ -285,11 +334,25 @@ function GoNavigator({ initialJourney }: { initialJourney: Journey }) {
       return;
     }
     const alt = banner.altJourney;
-    const nowSim = anchor.sim + (Date.now() - anchor.wall);
+    const wallNow = Date.now();
+    const nowSim = Math.min(simulationTime(anchor, wallNow, speed), jEnd);
     const altDepart = Date.parse(alt.departAt);
     setShiftMs(Math.max(0, Math.min(nowSim - altDepart, 20 * 60_000)));
+    setAnchor({ wall: wallNow, sim: nowSim });
     setJourney(alt);
     setBanner(null);
+    try {
+      sessionStorage.setItem("bt:journey", JSON.stringify(alt));
+    } catch {
+      // Current GO session remains usable.
+    }
+  }
+
+  function changeSpeed(nextSpeed: 1 | 30) {
+    if (nextSpeed === speed) return;
+    const wallNow = Date.now();
+    setAnchor(reanchorAtSpeedChange(anchor, wallNow, speed));
+    setSpeed(nextSpeed);
   }
 
   const overallProgress = Math.min(
@@ -414,7 +477,9 @@ function GoNavigator({ initialJourney }: { initialJourney: Journey }) {
             legs={journey.legs}
             vehicles={vehicles}
             highlightVehicleId={trackedVehicle?.id ?? null}
-            className="m-4 h-40 sm:h-52"
+            focusLegIndex={currentIdx >= 0 ? currentIdx : arrived ? journey.legs.length - 1 : null}
+            travellerPosition={travellerPosition}
+            className="m-4 h-52 sm:h-64"
           />
 
           {/* Upcoming steps */}
@@ -452,7 +517,7 @@ function GoNavigator({ initialJourney }: { initialJourney: Journey }) {
                   {[1, 30].map((s) => (
                     <button
                       key={s}
-                      onClick={() => setSpeed(s as 1 | 30)}
+                      onClick={() => changeSpeed(s as 1 | 30)}
                       aria-pressed={speed === s}
                       className={`px-3 py-2 type-micro focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-saffron ${
                         speed === s ? "bg-paper text-ink" : "bg-surface text-ink hover:bg-paper"

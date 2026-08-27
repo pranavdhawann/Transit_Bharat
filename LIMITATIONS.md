@@ -81,6 +81,11 @@ footer · this file · the README.
   `current-location` marker. Consequently, a current-location journey link is
   not portable to another tab or device, and accuracy depends on the browser
   and device location services.
+- **Specific Delhi addresses are supported through OpenStreetMap search.** A
+  typed query may be sent to the configured Photon-compatible geocoder. Chosen
+  coordinates are kept in `sessionStorage` and POST bodies, not in the route
+  URL. The default public Photon demo has no availability guarantee; production
+  deployments should set `GEOCODER_BASE_URL` to an owned or contracted service.
 - **Hindi is partial.** Key journey strings, search aliases and the disruption
   explanation are bilingual. The full interface is not.
 
@@ -90,18 +95,25 @@ footer · this file · the README.
 
 - **Walking distance drives coverage.** The router walks up to 900 m to reach
   the network. Landmarks further out get an auto first/last mile instead.
-- **31 of 81 landmark coordinates are hand-entered** approximate area
+- **32 of 83 landmark coordinates are hand-entered** approximate area
   centroids. 38 were snapped to or verified against real DMRC station
   coordinates; the rest had no station to check against and may be off by a
   few hundred metres.
 - **Vehicle simulator granularity.** Ping-pong interpolation along
   stop-to-stop straight lines, not road shapes. Plausible, not road-accurate.
+- **Displayed street geometry is an enhancement, not the routing engine.** Walk,
+  auto and bus lines are refined by configurable OSRM-compatible foot/road
+  services (`ROUTING_FOOT_URL`, `ROUTING_CAR_URL`). If they time out, the map
+  marks and retains the planner's approximate line while text directions remain
+  usable. The default public demo service has no SLA and should be replaced for
+  production. Metro lines retain their ordered station-chain geometry.
 - **Router optimality.** Dijkstra over a curated subset with composite cost
   profiles. Good on the pilot network; not a general-purpose Indian-city router.
 - **Journey IDs embed a one-minute time bucket**, so deep links re-plan once
   the bucket rolls over.
-- **GO-mode "Switch route"** restarts guidance from the new itinerary's
-  beginning rather than rebalancing mid-junction.
+- **GO-mode "Switch route"** aligns the alternative to current simulated time,
+  but it does not map-match a real rider mid-junction; GO remains a clearly
+  labelled simulation in this prototype.
 - **Map tiles depend on OpenFreeMap** (positron fallback, then an offline
   notice). No SLA. The text timeline stays usable by design.
 - **The disruption scenario lives in the browser** (sessionStorage), because

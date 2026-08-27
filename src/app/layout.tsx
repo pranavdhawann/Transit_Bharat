@@ -82,8 +82,9 @@ export default function RootLayout({
                 >
                   OpenStreetMap contributors
                 </a>{" "}
-                · Tiles by OpenFreeMap · Curated prototype network inspired by
-                Delhi corridors.
+                · Tiles by OpenFreeMap · Address search by Photon · Street
+                shapes by FOSSGIS routing services · Curated prototype network
+                inspired by Delhi corridors.
               </p>
               <p>
                 Vehicle positions shown as{" "}

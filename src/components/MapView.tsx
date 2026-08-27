@@ -3,30 +3,46 @@
 import type { Map as MLMap, GeoJSONSource } from "maplibre-gl";
 import { useEffect, useRef, useState } from "react";
 import "maplibre-gl/dist/maplibre-gl.css";
-import type { Leg, Vehicle } from "@/lib/types";
+import type { LatLng, Leg, Vehicle } from "@/lib/types";
 
 type MaplibreModule = typeof import("maplibre-gl");
 
 const DELHI_CENTER: [number, number] = [77.216, 28.6]; // lon, lat
+const DELHI_MAX_BOUNDS: [[number, number], [number, number]] = [
+  [76.7, 28.2],
+  [77.7, 29.15],
+];
 const STYLE_URL = "https://tiles.openfreemap.org/styles/liberty";
 
 interface MapViewProps {
   legs?: Leg[];
   vehicles?: Vehicle[];
   highlightVehicleId?: string | null;
+  /** GO mode focuses and emphasizes one leg at a time. */
+  focusLegIndex?: number | null;
+  travellerPosition?: (LatLng & { label?: string }) | null;
+  /** Fraction hidden by an overlaid mobile sheet; excluded from route fitting. */
+  occludedBottomFraction?: number;
   className?: string;
 }
 
-function legsToGeojson(legs: Leg[]) {
+function legState(index: number, focusLegIndex: number | null) {
+  if (focusLegIndex === null) return "all";
+  return index < focusLegIndex ? "completed" : index === focusLegIndex ? "active" : "future";
+}
+
+function legsToGeojson(legs: Leg[], focusLegIndex: number | null) {
   return {
     type: "FeatureCollection" as const,
     features: legs
-      .map((leg) => ({
+      .map((leg, index) => ({
         type: "Feature" as const,
         properties: {
           // MapLibre paint is evaluated by the GL renderer, so it cannot read CSS custom properties.
           color: leg.mode === "WALK" ? "#606B76" : (leg.routeColor ?? "#606B76"),
           kind: leg.mode === "WALK" ? "walk" : "transit",
+          state: legState(index, focusLegIndex),
+          approximate: leg.geometrySource === "APPROXIMATE" ? 1 : 0,
           name:
             leg.mode === "WALK"
               ? "Walk"
@@ -34,23 +50,25 @@ function legsToGeojson(legs: Leg[]) {
         },
         geometry: {
           type: "LineString" as const,
-          coordinates: leg.polyline.map(([lat, lon]) => [lon, lat] as [number, number]),
+          coordinates: leg.polyline
+            .filter(([lat, lon]) => validCoordinate(lat, lon))
+            .map(([lat, lon]) => [lon, lat] as [number, number]),
         },
       }))
       .filter((f) => f.geometry.coordinates.length >= 2),
   };
 }
 
-function stopsGeojson(legs: Leg[]) {
+function stopsGeojson(legs: Leg[], focusLegIndex: number | null) {
   const seen = new Set<string>();
   const features: GeoJSON.Feature[] = [];
-  for (const leg of legs) {
+  for (const [legIndex, leg] of legs.entries()) {
     for (const s of [leg.from, ...leg.intermediateStops, leg.to]) {
-      if (seen.has(s.id)) continue;
+      if (seen.has(s.id) || !validCoordinate(s.lat, s.lon)) continue;
       seen.add(s.id);
       features.push({
         type: "Feature",
-        properties: { name: s.name, id: s.id },
+        properties: { name: s.name, id: s.id, state: legState(legIndex, focusLegIndex) },
         geometry: { type: "Point", coordinates: [s.lon, s.lat] },
       });
     }
@@ -61,7 +79,7 @@ function stopsGeojson(legs: Leg[]) {
 function vehiclesGeojson(vehicles: Vehicle[], highlightId: string | null) {
   return {
     type: "FeatureCollection" as const,
-    features: vehicles.map((v) => ({
+    features: vehicles.filter((v) => validCoordinate(v.lat, v.lon)).map((v) => ({
       type: "Feature" as const,
       properties: {
         id: v.id,
@@ -76,12 +94,54 @@ function vehiclesGeojson(vehicles: Vehicle[], highlightId: string | null) {
   };
 }
 
+function travellerGeojson(position: (LatLng & { label?: string }) | null) {
+  return {
+    type: "FeatureCollection" as const,
+    features:
+      position && validCoordinate(position.lat, position.lon)
+        ? [
+            {
+              type: "Feature" as const,
+              properties: { name: position.label ?? "Your position" },
+              geometry: {
+                type: "Point" as const,
+                coordinates: [position.lon, position.lat],
+              },
+            },
+          ]
+        : [],
+  };
+}
+
 type PopupFactory = MaplibreModule["Popup"];
+
+function validCoordinate(lat: number, lon: number): boolean {
+  return (
+    Number.isFinite(lat) &&
+    lat >= DELHI_MAX_BOUNDS[0][1] &&
+    lat <= DELHI_MAX_BOUNDS[1][1] &&
+    Number.isFinite(lon) &&
+    lon >= DELHI_MAX_BOUNDS[0][0] &&
+    lon <= DELHI_MAX_BOUNDS[1][0]
+  );
+}
+
+function escapeHtml(value: unknown): string {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
 
 export default function MapView({
   legs = [],
   vehicles = [],
   highlightVehicleId = null,
+  focusLegIndex = null,
+  travellerPosition = null,
+  occludedBottomFraction = 0,
   className = "",
 }: MapViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -118,6 +178,8 @@ export default function MapView({
         style: STYLE_URL,
         center: DELHI_CENTER,
         zoom: 11.5,
+        maxBounds: DELHI_MAX_BOUNDS,
+        renderWorldCopies: false,
         attributionControl: { compact: true },
       });
       mapRef.current = map;
@@ -154,7 +216,8 @@ export default function MapView({
           layout: { "line-cap": "round", "line-join": "round" },
           paint: {
             "line-color": "#606B76",
-            "line-width": 2,
+            "line-width": ["case", ["==", ["get", "state"], "active"], 4, 2],
+            "line-opacity": ["case", ["in", ["get", "state"], ["literal", ["all", "active"]]], 1, 0.36],
             "line-dasharray": [1.5, 1.5],
           },
         });
@@ -166,8 +229,14 @@ export default function MapView({
           layout: { "line-cap": "round", "line-join": "round" },
           paint: {
             "line-color": ["get", "color"],
-            "line-width": 6,
-            "line-opacity": 1,
+            "line-width": ["case", ["==", ["get", "state"], "active"], 8, 6],
+            "line-opacity": ["case", ["in", ["get", "state"], ["literal", ["all", "active"]]], 1, 0.34],
+            "line-dasharray": [
+              "case",
+              ["==", ["get", "approximate"], 1],
+              ["literal", [2, 1.5]],
+              ["literal", [1, 0.01]],
+            ],
           },
         });
 
@@ -181,6 +250,7 @@ export default function MapView({
             "circle-color": "#F5F3EF",
             "circle-stroke-color": "#131A22",
             "circle-stroke-width": 2,
+            "circle-opacity": ["case", ["in", ["get", "state"], ["literal", ["all", "active"]]], 1, 0.38],
           },
         });
 
@@ -191,6 +261,29 @@ export default function MapView({
           source: "tb-vehicles",
           filter: ["==", ["get", "selected"], 1],
           paint: { "circle-radius": 14, "circle-color": "#606B76", "circle-opacity": 0.3 },
+        });
+
+        map.addSource("tb-traveller", { type: "geojson", data: empty });
+        map.addLayer({
+          id: "tb-traveller-halo",
+          type: "circle",
+          source: "tb-traveller",
+          paint: {
+            "circle-radius": 13,
+            "circle-color": "#E45B25",
+            "circle-opacity": 0.25,
+          },
+        });
+        map.addLayer({
+          id: "tb-traveller-dot",
+          type: "circle",
+          source: "tb-traveller",
+          paint: {
+            "circle-radius": 7,
+            "circle-color": "#E45B25",
+            "circle-stroke-color": "#F5F3EF",
+            "circle-stroke-width": 3,
+          },
         });
         map.addLayer({
           id: "tb-vehicle-dot",
@@ -223,12 +316,12 @@ export default function MapView({
     if (!map || !ready) return;
 
     function htmlFrom(props: Record<string, unknown>): string {
-      return `<strong>${String(props.name ?? props.routeNumber)}</strong><br/>
+      return `<strong>${escapeHtml(props.name ?? props.routeNumber)}</strong><br/>
         ${
           props.nextStopName !== undefined
-            ? `Next stop: ${String(props.nextStopName)}${
+            ? `Next stop: ${escapeHtml(props.nextStopName)}${
                 Number(props.delayMinutes) > 0
-                  ? ` · +${String(props.delayMinutes)} min delay`
+                  ? ` · +${escapeHtml(props.delayMinutes)} min delay`
                   : ""
               } · DEMO`
             : "Stop"
@@ -287,12 +380,20 @@ export default function MapView({
     const map = mapRef.current;
     if (!map || !ready) return;
     (map.getSource("tb-lines") as GeoJSONSource | undefined)?.setData(
-      legsToGeojson(legs),
+      legsToGeojson(legs, focusLegIndex),
     );
     (map.getSource("tb-stops") as GeoJSONSource | undefined)?.setData(
-      stopsGeojson(legs),
+      stopsGeojson(legs, focusLegIndex),
     );
-  }, [mapEpoch, legs]);
+  }, [mapEpoch, legs, focusLegIndex]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !ready) return;
+    (map.getSource("tb-traveller") as GeoJSONSource | undefined)?.setData(
+      travellerGeojson(travellerPosition),
+    );
+  }, [mapEpoch, travellerPosition]);
 
   // Vehicle positions - smoothly interpolated between poll snapshots.
   useEffect(() => {
@@ -357,30 +458,57 @@ export default function MapView({
     let minLat = 90;
     let maxLon = -180;
     let maxLat = -90;
-    for (const leg of legs) {
+    const visibleLegs =
+      focusLegIndex !== null && legs[focusLegIndex]
+        ? [legs[focusLegIndex]]
+        : legs;
+    for (const leg of visibleLegs) {
       for (const [lat, lon] of leg.polyline) {
+        if (!validCoordinate(lat, lon)) continue;
         minLon = Math.min(minLon, lon);
         maxLon = Math.max(maxLon, lon);
         minLat = Math.min(minLat, lat);
         maxLat = Math.max(maxLat, lat);
       }
     }
+    if (minLon > maxLon || minLat > maxLat) return;
+    map.resize();
     const reduceMotion =
       typeof window !== "undefined" &&
       window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const mobileOverlay =
+      typeof window !== "undefined" &&
+      !window.matchMedia("(min-width: 1024px)").matches;
+    const basePadding = focusLegIndex === null ? 56 : 42;
+    const hiddenBottom = mobileOverlay
+      ? (() => {
+          const rect = map.getContainer().getBoundingClientRect();
+          const sheetTop =
+            window.innerHeight *
+            (1 - Math.min(0.85, Math.max(0, occludedBottomFraction)));
+          // The map can extend below the viewport, so a percentage of map
+          // height under-counts what the fixed sheet actually covers.
+          return Math.max(0, Math.round(rect.bottom - sheetTop));
+        })()
+      : 0;
     map.fitBounds(
       [
         [minLon, minLat],
         [maxLon, maxLat],
       ],
       {
-        padding: 48,
-        maxZoom: 13.5,
+        padding: {
+          top: basePadding,
+          right: basePadding,
+          bottom: basePadding + hiddenBottom,
+          left: basePadding,
+        },
+        maxZoom: focusLegIndex === null ? 13.5 : 16,
         duration: reduceMotion ? 0 : 500,
         essential: true,
       },
     );
-  }, [mapEpoch, legs]);
+  }, [mapEpoch, legs, focusLegIndex, occludedBottomFraction]);
 
   return (
     <div

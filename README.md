@@ -46,14 +46,15 @@ answer is "this is demo data".
 ## The citizen journey (what reviewers should try)
 
 1. **Search.** Tap **Use current location** in the **From** box, or focus either
-   box to browse popular places. Type `chandni`, `du north`, `saket`, or
-   `लाजपत नगर`. 390 searchable places: 242 metro stations, 67 bus stops, 81
-   landmarks, with Hindi aliases.
+   box to browse popular places. Type `NRI Complex`, `C Block Kalkaji`,
+   `chandni`, `du north`, or `लाजपत नगर`. The curated index contains 392
+   places (242 metro stations, 67 bus stops, 83 landmarks); a Delhi-bounded
+   OpenStreetMap geocoder fills in societies, blocks and street addresses.
 2. **Compare.** **Find my route** → up to three options labelled
    *Recommended / Fastest / Cheapest*, each with time, fare, transfers,
    walking distance, a trust badge, and deterministic "why" reasons.
-3. **Follow.** Pick one → full text timeline plus a map with moving synthetic
-   buses (`DEMO · updated N sec ago`).
+3. **Follow.** Pick one → full text timeline plus a map with street-following
+   walk/road geometry and moving synthetic buses (`DEMO · updated N sec ago`).
 4. **Navigate.** **Start GO navigation** → one instruction at a time through
    walk → board → stops remaining → get ready → alight → transfer → arrive.
    Runs at 1× or 30×; **Advance** or Space steps it deterministically.
@@ -95,8 +96,9 @@ auto-rickshaw covers the first mile to the metro.
 PWA (Next.js 15 · TypeScript strict · Tailwind v4 · MapLibre)
         │
 Normalized API (route handlers — the frontend never sees a raw feed)
- ├─ GET  /api/places              place index: real GTFS stops + landmarks, fuzzy + Hindi
+ ├─ GET  /api/places              local index + Delhi-bounded address geocoder
  ├─ POST /api/journeys            multimodal planning (normalized)  ← OpenTripPlanner slot
+ ├─ POST /api/geometry             street-following walk/road display shapes
  ├─ GET  /api/vehicles            synthetic vehicle positions (DEMO)
  ├─ POST /api/ai/preferences      constraints only, never routes
  ├─ POST /api/ai/disruption-note  plain-language delay explanation, EN + HI
@@ -110,6 +112,8 @@ GTFS ingestion pipeline              Synthetic realtime layer
 | --- | --- |
 | `scripts/ingest-gtfs.mjs` | Zero-dependency GTFS validation + network generation |
 | `src/lib/graph.ts` | Deterministic Dijkstra router; cost profiles, semantic labels, auto first/last mile |
+| `src/lib/geocode.ts` | Swappable Photon-compatible Delhi address-search adapter |
+| `src/lib/route-geometry.ts` | Swappable OSRM-compatible foot/road geometry adapter with safe fallback |
 | `src/lib/provenance.ts` | Trust engine: LIVE / SCHEDULED / STALE / DEMO |
 | `src/lib/vehicles.ts` | Vehicle simulator — pure function of server time |
 | `src/lib/scenario.ts` | Disruption state machine, instance-independent |
@@ -153,15 +157,15 @@ Full detail, including every scope cut: **[LIMITATIONS.md](LIMITATIONS.md)**.
 
 ```bash
 npm run typecheck   # tsc --noEmit
-npm test            # 53 tests
+npm test            # 118 tests
 npm run build       # production build
 ```
 
 Tests cover router validity and determinism, fare bands, label semantics,
 walking-distance accounting, the auto first/last-mile rule, transfer caps,
 place-index coverage, provenance classification, vehicle simulation,
-scenario instance-independence and input validation, and the AI
-hallucination guard.
+scenario instance-independence, address handoff, routed map geometry, GO clock
+continuity, input validation, and the AI hallucination guard.
 
 > Do not run `npm run build` while `npm run dev` is running — both write to
 > `.next/` and will corrupt each other.

@@ -49,6 +49,11 @@ describe("place index coverage", () => {
     }
   });
 
+  it("finds the requested society-to-block example by its typed labels", () => {
+    expect(searchPlaces("NRI Complex")[0]?.id).toBe("lm:nri-complex-mandakini");
+    expect(searchPlaces("C Block Kalkaji")[0]?.id).toBe("lm:c-block-kalkaji");
+  });
+
   it("matches Hindi aliases", () => {
     expect(searchPlaces("चांदनी चौक").length).toBeGreaterThan(0);
   });

@@ -50,6 +50,9 @@ for the `/api/*` routes.
 | --- | --- | --- |
 | `OPENAI_API_KEY` | your key | Only if you want the real OpenAI parse path instead of the labelled heuristic fallback |
 | `OPENAI_MODEL` | e.g. `gpt-5-mini` | Optional; the code already defaults to this |
+| `GEOCODER_BASE_URL` | Photon-compatible `/api/` URL | Recommended for production; defaults to the public Photon demo |
+| `ROUTING_FOOT_URL` | OSRM-compatible foot-router base URL | Recommended for production; defaults to the public FOSSGIS demo |
+| `ROUTING_CAR_URL` | OSRM-compatible car-router base URL | Recommended for production; defaults to the public FOSSGIS demo |
 
 Scope them to **Production**, then **trigger a redeploy** — environment
 variables are read at build/run time and an existing deploy will not pick them

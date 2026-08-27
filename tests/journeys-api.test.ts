@@ -77,4 +77,28 @@ describe("journey API coordinate endpoints", () => {
     expect(response.status).toBe(200);
     expect(data.journeys[0]?.legs[0]?.from.name).toBe("Current location");
   });
+
+  it("keeps a bounded plain-text label for a selected geocoded place", async () => {
+    const request = new Request("http://localhost/api/journeys", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        fromLocation: {
+          kind: "place",
+          name: "NRI Complex <script>alert(1)</script>",
+          lat: 28.53015,
+          lon: 77.24875,
+        },
+        toId: "lm:c-block-kalkaji",
+      }),
+    });
+    const response = await POST(request);
+    const data = (await response.json()) as {
+      journeys: Array<{ legs: Array<{ from: { name: string } }> }>;
+    };
+    expect(response.status).toBe(200);
+    expect(data.journeys[0]?.legs[0]?.from.name).toBe(
+      "NRI Complex scriptalert(1)/script",
+    );
+  });
 });

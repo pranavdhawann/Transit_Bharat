@@ -112,7 +112,23 @@ function parseLocation(value: unknown): JourneyLocation | null {
   ) {
     return null;
   }
+  if (candidate.kind === "place") {
+    const name = safePlaceName(candidate.name);
+    if (!name) return null;
+    return { name, lat, lon, kind: "place" };
+  }
   return { name: "Current location", lat, lon };
+}
+
+function safePlaceName(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const name = value
+    .replace(/[\u0000-\u001f\u007f]/g, " ")
+    .replace(/[<>]/g, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 120);
+  return name.length > 0 ? name : null;
 }
 
 function displayName(p: { name: string; type?: string }): string {

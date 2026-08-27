@@ -13,6 +13,8 @@ export interface LatLng {
 
 export interface JourneyLocation extends LatLng {
   name: string;
+  /** Distinguishes a user-selected geocoder result from device geolocation. */
+  kind?: "place";
 }
 
 export interface StopRef {
@@ -44,6 +46,8 @@ export interface Leg {
   walkingMeters?: number;
   /** [lat, lon] pairs */
   polyline: [number, number][];
+  /** How closely the displayed line follows real transport infrastructure. */
+  geometrySource?: "ROUTED" | "NETWORK" | "APPROXIMATE";
   provenance: Provenance;
   /** Set when a demo disruption affects this leg. */
   delayMinutes?: number;
@@ -97,7 +101,7 @@ export interface Vehicle {
 export interface PlaceResult {
   id: string;
   name: string;
-  type: "landmark" | "stop" | "station" | "current";
+  type: "landmark" | "stop" | "station" | "current" | "address";
   lat: number;
   lon: number;
   detail?: string;

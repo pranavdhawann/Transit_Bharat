@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getPlace, searchPlaces, suggestedPlaces } from "@/lib/places";
+import { searchGeocodedPlaces } from "@/lib/geocode";
 
 export const dynamic = "force-dynamic";
 
@@ -18,5 +19,12 @@ export async function GET(request: Request) {
   if (q.trim().length === 0) {
     return NextResponse.json({ results: suggestedPlaces(), kind: "suggestions" });
   }
-  return NextResponse.json({ results: searchPlaces(q), kind: "results" });
+  const local = searchPlaces(q);
+  // The curated index wins. External lookup fills the long tail of societies,
+  // blocks and street addresses without making common stop searches dependent
+  // on a network service.
+  const external = local.length >= 4 ? [] : await searchGeocodedPlaces(q);
+  const seen = new Set(local.map((p) => p.id));
+  const results = [...local, ...external.filter((p) => !seen.has(p.id))].slice(0, 8);
+  return NextResponse.json({ results, kind: "results" });
 }

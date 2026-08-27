@@ -6,7 +6,7 @@ import type { PlaceResult } from "@/lib/types";
 /** Minimum characters before we run a text search (matches searchPlaces). */
 const MIN_QUERY = 2;
 /** Keystroke settle time before hitting /api/places. */
-const DEBOUNCE_MS = 160;
+const DEBOUNCE_MS = 280;
 
 type ListKind = "suggestions" | "results";
 
@@ -286,8 +286,13 @@ export default function PlaceInput({
           </ul>
           {showEmptyState && (
             <p className="px-3 py-3 text-sm text-ink-3">
-              No stop or landmark matches that. Try a nearby metro station, or a
-              landmark like Connaught Place.
+              No Delhi stop, landmark or address matches that. Add a locality or
+              postcode and try again.
+            </p>
+          )}
+          {results.some((r) => r.type === "address") && (
+            <p className="border-t border-rule px-3 py-2 text-[11px] text-ink-3">
+              Address search © OpenStreetMap contributors · powered by Photon
             </p>
           )}
         </div>

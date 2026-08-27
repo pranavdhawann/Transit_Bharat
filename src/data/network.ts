@@ -380,6 +380,26 @@ export const LANDMARKS: Landmark[] = [
     aliases: ["कालकाजी"],
   },
   {
+    id: "lm:nri-complex-mandakini",
+    name: "NRI Complex, Mandakini Enclave",
+    lat: 28.53015,
+    lon: 77.24875,
+    aliases: [
+      "NRI Complex",
+      "NRI Complex Kalkaji",
+      "NRI Complex GK 4",
+      "Greater Kailash IV NRI Complex",
+    ],
+  },
+  {
+    id: "lm:c-block-kalkaji",
+    name: "C Block, Kalkaji",
+    // Approximate block centroid between mapped B and G Block entrances.
+    lat: 28.5424,
+    lon: 77.2548,
+    aliases: ["Kalkaji C Block", "C Block Kalkaji"],
+  },
+  {
     id: "lm:greater-kailash",
     name: "Greater Kailash M Block Market",
     lat: 28.54184,

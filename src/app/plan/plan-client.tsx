@@ -12,6 +12,7 @@ import { fmtAge } from "@/lib/format";
 import { journeyEndpointFor } from "@/lib/current-location";
 import { useNow, useVehicles } from "@/lib/hooks";
 import { useLang } from "@/lib/i18n";
+import { enrichJourneyGeometry } from "@/lib/route-geometry-client";
 import {
   loadScenario,
   saveScenario,
@@ -102,6 +103,24 @@ export default function PlanClient() {
     [journeys, selectedId],
   );
 
+  // Street-following shapes are additive: route cards render immediately,
+  // then the selected map refines without blocking journey planning.
+  useEffect(() => {
+    if (!selected || selected.legs.every((leg) => leg.geometrySource)) return;
+    const controller = new AbortController();
+    void enrichJourneyGeometry(selected, controller.signal)
+      .then((enriched) => {
+        if (controller.signal.aborted || enriched === selected) return;
+        setJourneys((current) =>
+          current?.map((journey) =>
+            journey.id === enriched.id ? enriched : journey,
+          ) ?? current,
+        );
+      })
+      .catch(() => undefined);
+    return () => controller.abort();
+  }, [selected]);
+
   // Keep the URL shareable.
   useEffect(() => {
     if (selected && selected.id !== selParam) {
@@ -190,6 +209,7 @@ export default function PlanClient() {
     }
     const qs = new URLSearchParams({ sel: selected.id, from: fromId, to: toId });
     if (lessWalking) qs.set("lessWalk", "1");
+    if (maxTransfers !== null) qs.set("maxTransfers", String(maxTransfers));
     router.push("/go?" + qs.toString());
   }
 
@@ -371,6 +391,9 @@ export default function PlanClient() {
             legs={selected?.legs ?? []}
             vehicles={vehicles}
             highlightVehicleId={trackedVehicle?.id ?? null}
+            occludedBottomFraction={
+              snap === "peek" ? 0.18 : snap === "half" ? 0.52 : 0.82
+            }
             className="h-full w-full"
           />
         </div>

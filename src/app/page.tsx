@@ -9,6 +9,7 @@ import { constraintsFor, type PreferencesResult } from "@/lib/ai";
 import {
   currentLocationPlace,
   saveCurrentLocation,
+  saveSelectedPlace,
 } from "@/lib/current-location";
 import { t, useLang } from "@/lib/i18n";
 import { SUGGESTED_PAIRS } from "@/lib/places";
@@ -62,8 +63,18 @@ export default function HomePage() {
   }
 
   function selectFrom(place: PlaceResult | null) {
+    if (place?.type === "address" && !saveSelectedPlace(place)) {
+      setLocationError(true);
+      setLocationMessage("This address could not be saved for route planning. Allow site storage and try again.");
+      return;
+    }
     setFrom(place);
     if (place?.type !== "current") clearLocationStatus();
+  }
+
+  function selectTo(place: PlaceResult | null) {
+    if (place?.type === "address" && !saveSelectedPlace(place)) return;
+    setTo(place);
   }
 
   function useCurrentLocation() {
@@ -226,7 +237,7 @@ export default function HomePage() {
               label="To"
               placeholder="Destination — e.g. Connaught Place"
               value={to}
-              onSelect={setTo}
+              onSelect={selectTo}
               position="bottom"
             />
             <button

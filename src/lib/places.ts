@@ -178,7 +178,7 @@ export function searchPlaces(query: string, limit = 8): PlaceResult[] {
 
 /** Station beats landmark beats bus stop when scores tie. */
 function rank(type: PlaceResult["type"]): number {
-  return type === "station" ? 0 : type === "landmark" ? 1 : 2;
+  return type === "station" ? 0 : type === "landmark" ? 1 : type === "address" ? 2 : 3;
 }
 
 /**

@@ -5,16 +5,17 @@ import {
   journeyEndpointFor,
   loadCurrentLocation,
   saveCurrentLocation,
+  saveSelectedPlace,
 } from "../src/lib/current-location";
 
 function memoryStorage() {
-  let value: string | null = null;
+  const values = new Map<string, string>();
   return {
     getItem(key: string) {
-      return key === CURRENT_LOCATION_STORAGE_KEY ? value : null;
+      return values.get(key) ?? null;
     },
     setItem(key: string, next: string) {
-      if (key === CURRENT_LOCATION_STORAGE_KEY) value = next;
+      values.set(key, next);
     },
   };
 }
@@ -41,6 +42,28 @@ describe("current-location handoff", () => {
     expect(journeyEndpointFor(place.id, storage)).toEqual({
       location: { name: "Current location", lat: 28.558, lon: 77.1765 },
     });
+  });
+
+  it("hands a selected Delhi address to Plan without exposing coordinates in its id", () => {
+    const storage = memoryStorage();
+    const place = {
+      id: "geo:way:12345",
+      name: "Example Society, Delhi",
+      type: "address" as const,
+      lat: 28.53,
+      lon: 77.25,
+      detail: "South Delhi",
+    };
+    expect(saveSelectedPlace(place, storage)).toBe(true);
+    expect(journeyEndpointFor(place.id, storage)).toEqual({
+      location: {
+        name: "Example Society, Delhi",
+        lat: 28.53,
+        lon: 77.25,
+        kind: "place",
+      },
+    });
+    expect(place.id).not.toContain("28.53");
   });
 
   it("rejects corrupted or out-of-range stored coordinates", () => {
