@@ -66,11 +66,17 @@ with light values on `:root` and dark values under both
 |---|---|---|---|
 | `--bt-ink` | `#131A22` | `#EDEAE3` | body text, primary button fill |
 | `--bt-ink-2` | `#38434F` | `#A8B0B8` | secondary text |
-| `--bt-ink-3` | `#6B7783` | `#78838E` | tertiary text, micro-labels |
+| `--bt-ink-3` | `#606B76` | `#848E98` | tertiary text, micro-labels |
 | `--bt-paper` | `#F5F3EF` | `#10151A` | page ground |
 | `--bt-surface` | `#FFFFFF` | `#182029` | raised sheet |
 | `--bt-rule` | `#D9D5CC` | `#2A343E` | hairlines |
-| `--bt-saffron` | `#F26B1D` | `#FF8A3D` | the one accent |
+| `--bt-saffron` | `#DA601A` | `#FF8A3D` | the one accent |
+
+All values above are **computed, not eyeballed**, and verified against the
+targets in section 9. Worst cases: `--bt-ink-3` clears 4.91 on paper and 5.44
+on surface in light, 5.51 / 4.93 in dark; `--bt-saffron` clears 3.34 / 3.70 in
+light as a focus ring. The first-draft values for `--bt-ink-3` (`#6B7783`) and
+`--bt-saffron` (`#F26B1D`) failed at 4.13 and 2.75 and were rejected.
 
 `--bt-paper` is a warm off-white, deliberately not `slate-50`. It reads as
 printed signage rather than a dashboard and is the cheapest single change that
@@ -89,9 +95,9 @@ phone screen in sunlight.
 
 | State | Treatment | Token | Rationale |
 |---|---|---|---|
-| `LIVE` | filled, pulsing dot | `--bt-live: #0E8A4F` / dark `#28A96A` | the only state that earns a fill |
+| `LIVE` | filled, pulsing dot | `--bt-live: #0C7946` / dark `#28A96A` | the only state that earns a fill |
 | `SCHEDULED` | ink outline, **no fill, no hue** | `--bt-ink-2` | absence of live data = absence of colour |
-| `STALE` | hollow dot, amber | `--bt-stale: #C77700` / dark `#E09A20` | colour draining out of LIVE |
+| `STALE` | hollow dot, amber | `--bt-stale: #975A00` / dark `#E09A20` | colour draining out of LIVE |
 | `DEMO` | **diagonal hatch**, ink text | `--bt-ink-2` on hatch | drafting convention for "not real" |
 
 The hatch is a CSS `repeating-linear-gradient` at 45°, 3px stripe / 3px gap, at
@@ -121,32 +127,51 @@ it is currently inherited from framework defaults:
   section 7 bans.
 
 Both are replaced with a designed palette derived from the real DMRC line
-identities. Each route colour ships as a **pair**: `base` for the rail/bar, and
-`onBase` (ink or paper) chosen so label-on-colour clears **4.5:1**. Yellow is
-the forcing case — at signage saturation it cannot carry white text, so its
-`onBase` is ink.
+identities. Each route colour ships as a light/dark `base` pair.
+
+**`onBase` is computed, never authored.** For a given base, the label colour is
+whichever of ink or paper has the higher contrast against it, and that winner
+must clear **4.5:1**. Authoring `onBase` by hand was tried first and produced
+four wrong pairings; deriving it removes the entire error class and makes the
+test in section 10 meaningful rather than decorative.
+
+**The keyline rule.** A bar must also be visible against the ground, which is a
+separate constraint from label legibility. Any route colour whose base falls
+below **3:1** against the ground in either theme gets a 1px `--bt-ink` keyline
+around the bar. Exactly one line triggers this: `metro:yellow`, at 1.74:1
+against paper. Darkening yellow until it cleared 3:1 would turn it to mustard
+and destroy the line's identity — a keyline is what printed transit maps
+actually do, and it preserves the colour.
 
 Keyed by the `metro:<colour>` id in `metro-lines.json`. The data contains
 exactly these ten lines — verified against the file — so the table is
-exhaustive and no fallback hue is needed for metro.
+exhaustive and no fallback hue is needed for metro. Ratios below are the
+computed label contrast in each theme.
 
-| Line id | `base` light | `base` dark | `onBase` |
-|---|---|---|---|
-| `metro:red` | `#D0342C` | `#E8544B` | paper |
-| `metro:yellow` | `#E8B300` | `#F5C518` | ink |
-| `metro:blue` | `#0B57A4` | `#3E8FD6` | paper |
-| `metro:green` | `#1B7A3E` | `#33A05C` | paper |
-| `metro:violet` | `#5B2A86` | `#8E5FC0` | paper |
-| `metro:pink` | `#D4568C` | `#E87FAA` | ink |
-| `metro:magenta` | `#A8206B` | `#CE4A93` | paper |
-| `metro:aqua` | `#0A8C9E` | `#2BB4C6` | paper |
-| `metro:orange` (Airport Express) | `#E06A16` | `#F58A38` | ink |
-| `metro:rapid` | `#8D6E63` | `#A98A7E` | paper |
+| Line id | `base` light | `base` dark | on L | on D | keyline |
+|---|---|---|---|---|---|
+| `metro:red` | `#C43129` | `#D87772` | paper 4.96 | ink 5.67 | — |
+| `metro:yellow` | `#E8B300` | `#F0CD57` | ink 9.08 | ink 11.33 | **yes** |
+| `metro:blue` | `#0B57A4` | `#5E90C3` | paper 6.50 | ink 5.22 | — |
+| `metro:green` | `#1B793D` | `#69A77F` | paper 4.92 | ink 6.20 | — |
+| `metro:violet` | `#5B2A86` | `#9B7CB5` | paper 8.94 | ink 4.96 | — |
+| `metro:pink` | `#D65E92` | `#D789AB` | ink 4.90 | ink 6.72 | — |
+| `metro:magenta` | `#A8206B` | `#C66C9D` | paper 6.14 | ink 5.03 | — |
+| `metro:aqua` | `#087483` | `#5CA3AD` | paper 4.94 | ink 6.09 | — |
+| `metro:orange` (Airport Express) | `#E06A16` | `#E19561` | ink 5.21 | ink 7.24 | — |
+| `metro:rapid` | `#7F6359` | `#AB9891` | paper 4.95 | ink 6.37 | — |
 
 Bus corridors draw from a separate five-hue set, deliberately lower-chroma than
 the metro set so bus and metro are distinguishable as *classes* before you read
-a label: `#4A5D73`, `#7A5C3E`, `#3E6B5E`, `#6E4A63`, `#5C6438` (dark-mode
-variants lifted roughly 18% in lightness).
+a label. All five clear 4.5:1 in both themes and none needs a keyline.
+
+| Slot | `base` light | `base` dark | on L | on D |
+|---|---|---|---|---|
+| `bus:1` | `#4A5D73` | `#8894A3` | paper 6.10 | ink 5.68 |
+| `bus:2` | `#7A5C3E` | `#A79380` | paper 5.53 | ink 5.95 |
+| `bus:3` | `#3E6B5E` | `#809D95` | paper 5.46 | ink 5.99 |
+| `bus:4` | `#6E4A63` | `#9F8898` | paper 6.71 | ink 5.38 |
+| `bus:5` | `#5C6438` | `#93997C` | paper 5.68 | ink 5.91 |
 
 Data changes required: `metro-lines.json` colour values, `BUS_PALETTE`, and the
 `#607d8b` fallback at `network.ts:107`. The `scripts/ingest-gtfs.mjs` generator
@@ -191,8 +216,14 @@ the jitter in tell 4 and is the reason the width axis earns its place. One font
 file, two distinct visual voices.
 
 Fallback stack, in order: `Archivo, "Noto Sans Devanagari", ui-sans-serif,
-system-ui, "Segoe UI", Roboto, sans-serif`. `font-display: swap`. If the font
-request fails the layout must still hold — no metric-dependent positioning.
+system-ui, "Segoe UI", Roboto, sans-serif`. `font-display: swap`.
+
+Both families load through `next/font/google`, which downloads and **self-hosts
+them at build time**. There is therefore no runtime request to Google's servers
+— an improvement on the original plan of a `<link>` to `fonts.googleapis.com`:
+it removes a third-party runtime dependency, a privacy leak, and a render-block,
+and it means the "fonts blocked" failure mode cannot occur in production. The
+layout must still not depend on font metrics.
 
 ---
 
@@ -329,7 +360,9 @@ Non-negotiable, and the revamp must not regress what already works:
   `--bt-paper` and `--bt-surface`
 - body text clears **4.5:1**; Micro-scale labels clear **4.5:1** (not the 3:1
   large-text allowance — they are small); route labels on route colour clear
-  4.5:1 via the `onBase` pairing in section 3.3
+  4.5:1 via the computed `onBase` rule in section 3.3
+- route bars, as graphical objects, clear **3:1** against the ground, or carry
+  the keyline from section 3.3 when they cannot
 - every provenance state is distinguishable **without colour** — this is what
   the form treatments in section 3.2 buy, and it is a hard requirement, not a
   nicety
@@ -352,14 +385,20 @@ Added checks:
 1. **Negative-rule grep** (section 7) as a script in `package.json`, failing
    the run on any violation.
 2. **Contrast unit test** over the token table and the route palette, asserting
-   every documented pair clears its stated ratio in both themes. The palette is
-   data, so this is a pure function test with no DOM.
+   every documented pair clears its stated ratio in both themes, that each
+   computed `onBase` clears 4.5:1, and that any base below 3:1 against the
+   ground is flagged as needing a keyline. The palette is data, so this is a
+   pure function test with no DOM. Every value in sections 3.1–3.3 was
+   generated by this arithmetic before being written down, so the test is
+   expected to pass on the authored palette rather than discover it.
 3. **Provenance form test** asserting all four states differ by a non-colour
    attribute, so the section 3.2 guarantee cannot silently regress.
 
 Manual verification before claiming done: both themes at 375px and 1280px on
-all four screens, a keyboard-only pass through plan into GO, and the
-font-failure case with Google Fonts blocked.
+all four screens, and a keyboard-only pass through plan into GO. The
+"fonts blocked" case is no longer reachable now that `next/font` self-hosts
+(section 4), so it is replaced by confirming no request to
+`fonts.googleapis.com` or `fonts.gstatic.com` appears in the network log.
 
 ---
 
