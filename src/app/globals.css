@@ -114,6 +114,32 @@ body {
   );
 }
 
+/* ----------------------------------------------------------- route-seg
+   RouteBar transit segments (spec section 5.1). leg.routeColor only ever
+   carries the LIGHT base, so the component hands each segment both its
+   light and dark resolution as custom properties, and this rule picks the
+   right one with the exact three-way pattern used for tokens above — no
+   dark: variant, this project doesn't use one. */
+.route-seg {
+  background-color: var(--seg-bg);
+  color: var(--seg-fg);
+  box-shadow: var(--seg-keyline, none);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .route-seg {
+    background-color: var(--seg-bg-dark);
+    color: var(--seg-fg-dark);
+    box-shadow: var(--seg-keyline-dark, none);
+  }
+}
+
+:root[data-theme="dark"] .route-seg {
+  background-color: var(--seg-bg-dark);
+  color: var(--seg-fg-dark);
+  box-shadow: var(--seg-keyline-dark, none);
+}
+
 /* MapLibre popup styling to match the design system */
 .maplibregl-popup-content {
   border-radius: 2px !important;

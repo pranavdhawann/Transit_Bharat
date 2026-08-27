@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { contrastRatio } from "@/lib/contrast";
 import {
   BUS_BASES,
+  darkFor,
   METRO_BASES,
   needsKeyline,
   resolveOnBase,
@@ -51,6 +52,24 @@ describe("route palette", () => {
         `${route.id} fallback colour ${route.color} is not in the palette`,
       ).toBe(true);
     }
+  });
+  it("darkFor returns the palette's own dark counterpart for every light base, not a passthrough", () => {
+    for (const [id, pair] of Object.entries(METRO_BASES)) {
+      expect(darkFor(pair.light), `${id} light -> dark`).toBe(pair.dark);
+    }
+    BUS_BASES.forEach((pair, i) => {
+      expect(darkFor(pair.light), `bus:${i + 1} light -> dark`).toBe(pair.dark);
+    });
+  });
+
+  it("darkFor is case-insensitive on the lookup", () => {
+    const [, examplePair] = Object.entries(METRO_BASES)[0];
+    expect(darkFor(examplePair.light.toUpperCase())).toBe(examplePair.dark);
+  });
+
+  it("darkFor returns the input unchanged for a colour outside the palette", () => {
+    expect(darkFor("#606B76")).toBe("#606B76");
+    expect(darkFor("#ABCDEF")).toBe("#ABCDEF");
   });
 });
 

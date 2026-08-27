@@ -55,3 +55,24 @@ export function resolveOnBase(base: string, theme: Theme): string {
 export function needsKeyline(base: string, theme: Theme): boolean {
   return contrastRatio(base, THEMES[theme].paper) < 3;
 }
+
+/**
+ * Reverse lookup: given the LIGHT base of a route (what leg.routeColor
+ * carries), return its DARK counterpart from the same palette entry.
+ *
+ * The two bases are not colour transforms of each other — they are
+ * hand-authored pairs in METRO_BASES/BUS_BASES — so this is a lookup, not a
+ * computation. A colour outside the palette (the ink-3 fallback, or stale
+ * data) is returned unchanged: a route bar must never throw over an unknown
+ * colour.
+ */
+export function darkFor(lightBase: string): string {
+  const needle = lightBase.toLowerCase();
+  for (const pair of Object.values(METRO_BASES)) {
+    if (pair.light.toLowerCase() === needle) return pair.dark;
+  }
+  for (const pair of BUS_BASES) {
+    if (pair.light.toLowerCase() === needle) return pair.dark;
+  }
+  return lightBase;
+}

@@ -1,18 +1,28 @@
 "use client";
 
-import { needsKeyline, resolveOnBase } from "@/lib/route-palette";
+import type { CSSProperties } from "react";
+import { darkFor, needsKeyline, resolveOnBase } from "@/lib/route-palette";
 import { routeBarSegments } from "@/lib/routebar";
+import { THEMES } from "@/lib/tokens";
 import type { Leg } from "@/lib/types";
+
+const INK_KEYLINE = "inset 0 0 0 1px var(--bt-ink)";
+
+/** Per-segment custom properties consumed by the `.route-seg` rule in globals.css. */
+type SegStyle = CSSProperties & Record<string, string>;
 
 /**
  * A journey rendered as a miniature line diagram: segment widths are leg
  * durations, fills are the real route colours. The shape of a trip is legible
  * before any text is read.
  *
- * Theme note: onBase and the keyline are resolved against the LIGHT theme
- * because leg.routeColor carries the light base from the network data. Dark
- * mode swaps the ground, not the route colour, and every light base already
- * clears 4.5:1 for its label (tests/route-palette.test.ts).
+ * Theme note: leg.routeColor only ever carries the LIGHT base. Dark mode
+ * swaps the ground to #10151A, and 7 of 15 route colours fall under 3:1
+ * against it — so the light base cannot simply be reused. METRO_BASES and
+ * BUS_BASES (Task 4) already define a matching dark base for every route;
+ * darkFor() looks it up, and each segment is handed BOTH resolutions as CSS
+ * custom properties so the cascade — not this component — picks the one
+ * that matches the active theme (see `.route-seg` in globals.css).
  */
 export default function RouteBar({
   legs,
@@ -46,19 +56,27 @@ export default function RouteBar({
             />
           );
         }
-        const base = segment.color ?? "#606B76";
+
+        // Unknown/missing route colour falls back to the ink-3 token rather
+        // than a hand-typed hex, so it can never drift from tokens.ts.
+        const lightBase = segment.color ?? THEMES.light.ink3;
+        const darkBase = segment.color ? darkFor(segment.color) : THEMES.dark.ink3;
+
+        const style: SegStyle = {
+          width: `${segment.percent}%`,
+          "--seg-bg": segment.color ?? "var(--bt-ink-3)",
+          "--seg-bg-dark": segment.color ? darkBase : "var(--bt-ink-3)",
+          "--seg-fg": resolveOnBase(lightBase, "light"),
+          "--seg-fg-dark": resolveOnBase(darkBase, "dark"),
+          "--seg-keyline": needsKeyline(lightBase, "light") ? INK_KEYLINE : "none",
+          "--seg-keyline-dark": needsKeyline(darkBase, "dark") ? INK_KEYLINE : "none",
+        };
+
         return (
           <span
             key={i}
-            className="type-data flex h-full items-center justify-center overflow-hidden border-r border-paper text-[11px]"
-            style={{
-              width: `${segment.percent}%`,
-              backgroundColor: base,
-              color: resolveOnBase(base, "light"),
-              boxShadow: needsKeyline(base, "light")
-                ? "inset 0 0 0 1px var(--bt-ink)"
-                : undefined,
-            }}
+            className="route-seg type-data flex h-full items-center justify-center overflow-hidden border-r border-paper text-[11px]"
+            style={style}
           >
             {segment.label}
           </span>
