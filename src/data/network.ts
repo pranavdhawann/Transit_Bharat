@@ -10,7 +10,7 @@
  */
 import metroLinesJson from "./generated/metro-lines.json";
 import busCorridorsJson from "./generated/bus-corridors.json";
-import { BUS_BASES } from "@/lib/route-palette";
+import { BUS_BASES, METRO_BASES } from "@/lib/route-palette";
 
 export interface NetworkStop {
   id: string;
@@ -771,12 +771,12 @@ export function allStops(): NetworkStop[] {
 
 // ------------------------------------------------- Curated fallback data --
 
-const CURATED_METRO_LINES: MetroLine[] = [
+export const CURATED_METRO_LINES: MetroLine[] = [
   {
     id: "metro:yellow",
     name: "Yellow Line",
     shortName: "Yellow",
-    color: "#c9a800",
+    color: METRO_BASES["metro:yellow"].light,
     speedKmh: 33,
     stations: [
       { id: "m:y:hauz-khas", name: "Hauz Khas", lat: 28.5434, lon: 77.2068 },
@@ -791,7 +791,7 @@ const CURATED_METRO_LINES: MetroLine[] = [
     id: "metro:magenta",
     name: "Magenta Line",
     shortName: "Magenta",
-    color: "#c2187e",
+    color: METRO_BASES["metro:magenta"].light,
     speedKmh: 34,
     stations: [
       { id: "m:g:hauz-khas", name: "Hauz Khas", lat: 28.5434, lon: 77.2068 },
@@ -800,12 +800,12 @@ const CURATED_METRO_LINES: MetroLine[] = [
   },
 ];
 
-const CURATED_BUS_ROUTES: BusRoute[] = [
+export const CURATED_BUS_ROUTES: BusRoute[] = [
   {
     id: "bus:620",
     number: "620",
     name: "Munirka - Connaught Place",
-    color: "#2563eb",
+    color: BUS_BASES[0].light,
     speedKmh: 16,
     cycleMinutes: 74,
     vehicles: 4,

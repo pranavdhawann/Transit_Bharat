@@ -6,7 +6,11 @@ import {
   needsKeyline,
   resolveOnBase,
 } from "@/lib/route-palette";
-import { METRO_LINES } from "@/data/network";
+import {
+  CURATED_BUS_ROUTES,
+  CURATED_METRO_LINES,
+  METRO_LINES,
+} from "@/data/network";
 
 const THEME_NAMES = ["light", "dark"] as const;
 const BANNED = ["#2563eb", "#0d9488", "#b45309", "#7c3aed", "#be185d"];
@@ -26,6 +30,27 @@ describe("route palette", () => {
       ...BUS_BASES,
     ].flatMap((p) => [p.light.toLowerCase(), p.dark.toLowerCase()]);
     for (const banned of BANNED) expect(all).not.toContain(banned);
+  });
+
+  it("keeps the degraded-data fallback routes on palette colours", () => {
+    const paletteColors = new Set(
+      [...Object.values(METRO_BASES), ...BUS_BASES].flatMap((p) => [
+        p.light.toLowerCase(),
+        p.dark.toLowerCase(),
+      ]),
+    );
+    for (const line of CURATED_METRO_LINES) {
+      expect(
+        paletteColors.has(line.color.toLowerCase()),
+        `${line.id} fallback colour ${line.color} is not in the palette`,
+      ).toBe(true);
+    }
+    for (const route of CURATED_BUS_ROUTES) {
+      expect(
+        paletteColors.has(route.color.toLowerCase()),
+        `${route.id} fallback colour ${route.color} is not in the palette`,
+      ).toBe(true);
+    }
   });
 });
 
