@@ -10,7 +10,6 @@ import { THEMES } from "@/lib/tokens";
  */
 const ALLOWLIST: string[] = [
   "src/app/plan/page.tsx",
-  "src/app/go/go-client.tsx",
   "src/app/go/page.tsx",
   "src/app/about/page.tsx",
   "src/components/LangToggle.tsx",

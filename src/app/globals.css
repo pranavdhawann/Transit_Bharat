@@ -10,6 +10,7 @@
   --bt-paper: #f5f3ef;
   --bt-surface: #ffffff;
   --bt-rule: #d9d5cc;
+  --bt-tick-empty: #d9d5cc;
   --bt-saffron: #da601a;
   --bt-live: #0c7946;
   --bt-stale: #975a00;
@@ -23,6 +24,7 @@
     --bt-paper: #10151a;
     --bt-surface: #182029;
     --bt-rule: #2a343e;
+    --bt-tick-empty: #2a343e;
     --bt-saffron: #ff8a3d;
     --bt-live: #28a96a;
     --bt-stale: #e09a20;
@@ -36,6 +38,7 @@
   --bt-paper: #10151a;
   --bt-surface: #182029;
   --bt-rule: #2a343e;
+  --bt-tick-empty: #2a343e;
   --bt-saffron: #ff8a3d;
   --bt-live: #28a96a;
   --bt-stale: #e09a20;
@@ -53,6 +56,7 @@
   --color-paper: var(--bt-paper);
   --color-surface: var(--bt-surface);
   --color-rule: var(--bt-rule);
+  --color-tick-empty: var(--bt-tick-empty);
   --color-saffron: var(--bt-saffron);
   --color-live: var(--bt-live);
   --color-stale: var(--bt-stale);

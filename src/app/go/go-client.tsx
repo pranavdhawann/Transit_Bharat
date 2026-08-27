@@ -7,6 +7,7 @@ import LangToggle from "@/components/LangToggle";
 import ModeIcon from "@/components/ModeIcon";
 import MapView from "@/components/MapView";
 import ProvenanceBadge from "@/components/ProvenanceBadge";
+import RouteBar from "@/components/RouteBar";
 import { fmtClockIST, fmtDurationMinutes, fmtWalk } from "@/lib/format";
 import { useVehicles } from "@/lib/hooks";
 import { loadScenario, scenarioQuery } from "@/lib/scenario-client";
@@ -18,6 +19,9 @@ interface Boundary {
   rideStart: number;
   leg: Leg;
 }
+
+const CONTROL =
+  "rounded-[2px] border border-rule bg-surface px-3 py-2 type-micro text-ink hover:bg-paper focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-saffron";
 
 export default function GoClient() {
   const params = useSearchParams();
@@ -77,13 +81,10 @@ export default function GoClient() {
   if (missing) {
     return (
       <div className="py-16 text-center">
-        <p className="text-slate-600">
+        <p className="text-ink-2">
           No journey selected. Plan a route first.
         </p>
-        <Link
-          href="/"
-          className="mt-3 inline-block font-medium text-blue-600 hover:underline"
-        >
+        <Link href="/" className={`mt-3 inline-block ${CONTROL}`}>
           Back to search
         </Link>
       </div>
@@ -92,7 +93,7 @@ export default function GoClient() {
 
   if (!journey) {
     return (
-      <p className="py-16 text-center text-sm text-slate-400">
+      <p className="py-16 text-center text-sm text-ink-3">
         Preparing navigation…
       </p>
     );
@@ -303,7 +304,7 @@ function GoNavigator({ initialJourney }: { initialJourney: Journey }) {
         <div className="flex items-center gap-2">
           <Link
             href="/"
-            className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium shadow-sm hover:bg-slate-50"
+            className={CONTROL}
           >
             &larr; Exit GO
           </Link>
@@ -311,53 +312,73 @@ function GoNavigator({ initialJourney }: { initialJourney: Journey }) {
               language switch has to be reachable here too. */}
           <LangToggle />
         </div>
-        <span className="rounded-full border border-violet-200 bg-violet-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-violet-700">
+        <span className="hatch type-micro border border-rule px-3 py-1 text-ink-2">
           Synthetic realtime data · DEMO
         </span>
       </div>
 
       {!running ? (
-        <section className="space-y-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-          <h1 className="text-xl font-bold tracking-tight">Ready to go?</h1>
+        <section className="space-y-4 border border-rule bg-surface p-6">
+          <h1 className="type-display text-2xl">Ready to go?</h1>
           <JourneySummary journey={journey} />
           <button
             onClick={start}
-            className="w-full rounded-xl bg-emerald-600 px-6 py-4 text-lg font-bold text-white shadow-sm hover:bg-emerald-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700"
+            className="type-display w-full rounded-[2px] bg-ink px-6 py-4 text-lg text-paper hover:bg-ink-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-saffron"
           >
             Start journey
           </button>
-          <p className="text-center text-xs text-slate-400">
+          <p className="text-center text-xs text-ink-3">
             Demo runs at 30&times; speed. Press Space or the Advance button to
             step through states.
           </p>
         </section>
       ) : (
-        <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <section className="overflow-hidden border border-rule bg-surface">
           {/* Instruction hero */}
-          <div className="bg-slate-900 px-5 py-6 text-white sm:px-7">
+          <div className="bg-ink px-5 py-6 text-paper sm:px-7">
             {arrived ? (
               <>
-                <p className="text-xs font-semibold uppercase tracking-widest text-emerald-400">
+                <p className="type-micro text-saffron">
                   Arrived
                 </p>
-                <h1 className="mt-1 text-2xl font-bold leading-tight">
+                <h1 className="type-display mt-1 text-2xl">
                   You have reached your destination.
                 </h1>
               </>
             ) : current ? (
               <Instruction boundary={current} simNow={clampedNow} />
             ) : (
-              <h1 className="text-xl font-semibold">
+              <h1 className="type-display text-2xl">
                 Your journey starts at {fmtClockIST(journey.departAt)}.
               </h1>
             )}
-            <div className="mt-4 h-2 overflow-hidden rounded-full bg-white/15">
-              <div
-                className="bt-animate h-full rounded-full bg-emerald-400"
-                style={{ width: `${arrived ? 100 : overallProgress}%` }}
-              />
+            <div
+              className="mt-4 flex gap-1"
+              role="progressbar"
+              aria-valuenow={Math.round(arrived ? 100 : overallProgress)}
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-label="Journey progress"
+            >
+              {journey.legs.map((_, i) => {
+                const legShare = 100 / journey.legs.length;
+                const filled = arrived || overallProgress >= (i + 1) * legShare;
+                const active = !filled && overallProgress > i * legShare;
+                return (
+                  <span
+                    key={i}
+                    className={`bt-animate h-1.5 flex-1 transition-colors ${
+                      filled
+                        ? "bg-paper"
+                        : active
+                          ? "bg-saffron"
+                          : "bg-tick-empty"
+                    }`}
+                  />
+                );
+              })}
             </div>
-            <p className="mt-2 text-xs text-slate-300">
+            <p className="mt-2 text-xs text-paper">
               {fmtClockIST(new Date(clampedNow).toISOString())} simulated ·{" "}
               {Math.round(overallProgress)}% complete
             </p>
@@ -365,7 +386,7 @@ function GoNavigator({ initialJourney }: { initialJourney: Journey }) {
 
           {/* Disruption */}
           {banner && banner.savedMin > 0 && (
-            <div className="border-b border-red-200 bg-red-50 px-5 py-3 text-sm text-red-900">
+            <div className="border-b border-stale bg-surface px-5 py-3 text-sm text-ink">
               <p className="font-semibold">
                 Bus delayed +{banner.delayMin} min — you would miss your connection.
               </p>
@@ -374,7 +395,7 @@ function GoNavigator({ initialJourney }: { initialJourney: Journey }) {
               </p>
               <button
                 onClick={switchRoute}
-                className="mt-2 rounded-lg bg-red-700 px-4 py-2 text-xs font-bold uppercase tracking-wide text-white hover:bg-red-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+                className="type-micro mt-2 rounded-[2px] border border-rule bg-ink px-4 py-2 text-paper hover:bg-ink-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-saffron"
               >
                 Switch route
               </button>
@@ -394,19 +415,19 @@ function GoNavigator({ initialJourney }: { initialJourney: Journey }) {
           )}
 
           {/* Controls */}
-          <div className="flex flex-wrap items-center gap-2 border-t border-slate-200 px-4 py-3">
+          <div className="flex flex-wrap items-center gap-2 border-t border-rule px-4 py-3">
             {arrived ? (
               <>
                 <Link
                   href="/"
                   onClick={() => sessionStorage.removeItem("bt:journey")}
-                  className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+                  className={CONTROL}
                 >
                   Plan another journey
                 </Link>
                 <button
                   onClick={restart}
-                  className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-blue-600"
+                  className={CONTROL}
                 >
                   Replay demo
                 </button>
@@ -415,18 +436,18 @@ function GoNavigator({ initialJourney }: { initialJourney: Journey }) {
               <>
                 <button
                   onClick={advance}
-                  className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900"
+                  className={CONTROL}
                 >
                   Advance &rarr;
                 </button>
-                <div className="flex overflow-hidden rounded-lg border border-slate-300" role="group" aria-label="Simulation speed">
+                <div className="flex overflow-hidden rounded-[2px] border border-rule" role="group" aria-label="Simulation speed">
                   {[1, 30].map((s) => (
                     <button
                       key={s}
                       onClick={() => setSpeed(s as 1 | 30)}
                       aria-pressed={speed === s}
-                      className={`px-3 py-2 text-xs font-medium focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-blue-600 ${
-                        speed === s ? "bg-slate-900 text-white" : "bg-white text-slate-600 hover:bg-slate-50"
+                      className={`px-3 py-2 type-micro focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-saffron ${
+                        speed === s ? "bg-paper text-ink" : "bg-surface text-ink hover:bg-paper"
                       }`}
                     >
                       {s}&times;
@@ -437,13 +458,13 @@ function GoNavigator({ initialJourney }: { initialJourney: Journey }) {
                   <button
                     onClick={() => void simulateDelay()}
                     disabled={busy}
-                    className="ml-auto rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-xs font-semibold text-red-700 hover:bg-red-100 disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-red-600"
+                    className={`ml-auto ${CONTROL} disabled:opacity-50`}
                   >
                     Simulate delay (demo)
                   </button>
                 )}
                 {(journey.disrupted || banner) && (
-                  <span className="ml-auto rounded-full border border-red-200 bg-red-50 px-2 py-1 text-[11px] font-semibold text-red-700">
+                  <span className="type-micro ml-auto border border-stale bg-surface px-2 py-1 text-stale">
                     Delayed +{journey.legs.find((l) => l.delayMinutes)?.delayMinutes ?? banner?.delayMin} min
                   </span>
                 )}
@@ -460,31 +481,28 @@ function GoNavigator({ initialJourney }: { initialJourney: Journey }) {
 
 function JourneySummary({ journey }: { journey: Journey }) {
   return (
-    <ul className="space-y-2 text-sm">
-      {journey.legs.map((leg, i) => (
-        <li key={i} className="flex items-center gap-2">
-          <span
-            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-white"
-            style={{
-              backgroundColor:
-                leg.mode === "WALK" ? "#64748b" : (leg.routeColor ?? "#2563eb"),
-            }}
-          >
-            <ModeIcon mode={leg.mode} size={14} />
-          </span>
-          <span>
-            {leg.mode === "WALK"
-              ? `Walk ${fmtWalk(leg.walkingMeters ?? 0)} to ${leg.to.name}`
-              : leg.mode === "AUTO"
-                ? `Auto · ${leg.from.name} → ${leg.to.name}`
-                : `${leg.routeNumber} ${leg.routeName} · ${leg.from.name} → ${leg.to.name}`}
-          </span>
-          <span className="ml-auto shrink-0 text-xs text-slate-400">
-            ~{Math.round(leg.durationMinutes)} min
-          </span>
-        </li>
-      ))}
-    </ul>
+    <>
+      <RouteBar legs={journey.legs} />
+      <ul className="mt-4 space-y-2 text-sm">
+        {journey.legs.map((leg, i) => (
+          <li key={i} className="flex items-center gap-2">
+            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-rule bg-surface text-ink-2">
+              <ModeIcon mode={leg.mode} size={14} />
+            </span>
+            <span>
+              {leg.mode === "WALK"
+                ? `Walk ${fmtWalk(leg.walkingMeters ?? 0)} to ${leg.to.name}`
+                : leg.mode === "AUTO"
+                  ? `Auto · ${leg.from.name} → ${leg.to.name}`
+                  : `${leg.routeNumber} ${leg.routeName} · ${leg.from.name} → ${leg.to.name}`}
+            </span>
+            <span className="ml-auto shrink-0 text-xs text-ink-3">
+              ~{Math.round(leg.durationMinutes)} min
+            </span>
+          </li>
+        ))}
+      </ul>
+    </>
   );
 }
 
@@ -505,13 +523,13 @@ function Instruction({
     const remaining = Math.max(1, Math.ceil((1 - frac) * leg.durationMinutes));
     return (
       <>
-        <p className="text-xs font-semibold uppercase tracking-widest text-blue-300">
+        <p className="type-micro text-saffron">
           Now
         </p>
-        <h1 className="mt-1 text-2xl font-bold leading-tight">
+        <h1 className="type-display mt-1 text-2xl">
           Walk to {leg.to.name}
         </h1>
-        <p className="mt-1 text-sm text-slate-300">
+        <p className="mt-1 text-sm text-paper">
           {fmtWalk(leg.walkingMeters ?? 0)} · about {remaining} min left
         </p>
       </>
@@ -523,15 +541,15 @@ function Instruction({
     if (untilBoard > 2) {
       return (
         <>
-          <p className="text-xs font-semibold uppercase tracking-widest text-amber-300">
+          <p className="type-micro text-saffron">
             Get ready
           </p>
-          <h1 className="mt-1 text-2xl font-bold leading-tight">
+          <h1 className="type-display mt-1 text-2xl">
             {leg.mode === "AUTO"
               ? "Wait for your auto"
               : `Wait for ${leg.mode === "BUS" ? "bus" : "metro"} ${leg.routeNumber}`}
           </h1>
-          <p className="mt-1 flex flex-wrap items-center gap-2 text-sm text-slate-300">
+          <p className="mt-1 flex flex-wrap items-center gap-2 text-sm text-paper">
             Board at {leg.from.name} · arrives {fmtClockIST(new Date(boundary.rideStart).toISOString())}
             <ProvenanceBadge provenance="DEMO" suffix="live position" />
           </p>
@@ -540,13 +558,13 @@ function Instruction({
     }
     return (
       <>
-        <p className="text-xs font-semibold uppercase tracking-widest text-amber-300">
+        <p className="type-micro text-saffron">
           Approaching
         </p>
-          <h1 className="mt-1 text-2xl font-bold leading-tight">
+          <h1 className="type-display mt-1 text-2xl">
             Your {leg.mode === "AUTO" ? "auto" : leg.mode === "BUS" ? "bus" : "train"} is arriving
           </h1>
-          <p className="mt-1 text-sm text-slate-300">
+          <p className="mt-1 text-sm text-paper">
             Stand at {leg.from.name}
             {leg.headsign ? ` — board toward ${leg.headsign}.` : "."}
           </p>
@@ -567,13 +585,13 @@ function Instruction({
   if (stopsRemaining <= 1 && leg.mode !== "AUTO") {
     return (
       <>
-        <p className="text-xs font-semibold uppercase tracking-widest text-orange-300">
+        <p className="type-micro text-saffron">
           Get ready
         </p>
-        <h1 className="mt-1 text-2xl font-bold leading-tight">
+        <h1 className="type-display mt-1 text-2xl">
           Next stop is yours: {leg.to.name}
         </h1>
-        <p className="mt-1 text-sm text-slate-300">
+        <p className="mt-1 text-sm text-paper">
           Move toward the door — get off at {leg.to.name}.
         </p>
       </>
@@ -582,21 +600,24 @@ function Instruction({
 
   return (
     <>
-      <p className="text-xs font-semibold uppercase tracking-widest text-emerald-300">
+      <p className="type-micro text-saffron">
         On board
       </p>
-      <h1 className="mt-1 text-2xl font-bold leading-tight">
+      <h1 className="type-display mt-1 text-2xl">
         {leg.mode === "AUTO"
           ? "Ride your auto"
           : `Ride ${leg.mode === "BUS" ? "bus" : "metro"} ${leg.routeNumber}`}
-        <span className="block text-base font-medium text-slate-300">
+        <span className="block text-base font-medium text-paper">
           {leg.from.name} &rarr; {leg.to.name}
         </span>
       </h1>
-      <p className="mt-1 text-sm text-slate-300">
+      <p className="mt-2 text-sm text-paper">
         {leg.mode === "AUTO"
           ? `Get off at ${leg.to.name}`
-          : `${stopsRemaining} stop${stopsRemaining === 1 ? "" : "s"} remaining · get off at ${leg.to.name}`}
+          : <>
+              <span className="type-data text-4xl">{stopsRemaining}</span>{" "}
+              stop{stopsRemaining === 1 ? "" : "s"} remaining · get off at {leg.to.name}
+            </>}
       </p>
     </>
   );
@@ -612,11 +633,11 @@ function UpNext({
   const upcoming = boundaries.slice(currentIndex + 1, currentIndex + 3);
   if (!upcoming.length) return null;
   return (
-    <div className="border-t border-slate-100 px-5 py-3">
-      <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+    <div className="border-t border-rule px-5 py-3">
+      <p className="type-micro text-ink-3">
         Then
       </p>
-      <ul className="mt-1 space-y-1 text-sm text-slate-500">
+      <ul className="mt-1 space-y-1 text-sm text-ink-2">
         {upcoming.map((b, i) => (
           <li key={i}>
             {b.leg.mode === "WALK"

@@ -14,6 +14,7 @@ export interface ThemeTokens {
   paper: string;
   surface: string;
   rule: string;
+  tickEmpty: string;
   saffron: string;
   live: string;
   stale: string;
@@ -27,6 +28,7 @@ export const THEMES: Record<"light" | "dark", ThemeTokens> = {
     paper: "#F5F3EF",
     surface: "#FFFFFF",
     rule: "#D9D5CC",
+    tickEmpty: "#D9D5CC",
     saffron: "#DA601A",
     live: "#0C7946",
     stale: "#975A00",
@@ -38,6 +40,7 @@ export const THEMES: Record<"light" | "dark", ThemeTokens> = {
     paper: "#10151A",
     surface: "#182029",
     rule: "#2A343E",
+    tickEmpty: "#2A343E",
     saffron: "#FF8A3D",
     live: "#28A96A",
     stale: "#E09A20",
