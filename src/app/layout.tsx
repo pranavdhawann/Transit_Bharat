@@ -1,6 +1,25 @@
 import type { Metadata, Viewport } from "next";
 import Link from "next/link";
+import { Archivo, Noto_Sans_Devanagari } from "next/font/google";
 import "./globals.css";
+
+// Archivo is a true variable font on Google Fonts (weight 100-900, width
+// 62-125%), so one file gives us both the expanded Display voice and the
+// condensed Data voice. next/font self-hosts it at build time, so there is no
+// runtime request to Google.
+const archivo = Archivo({
+  subsets: ["latin"],
+  axes: ["wdth"],
+  display: "swap",
+  variable: "--font-archivo",
+});
+
+// Archivo has no Devanagari coverage; Hindi copy falls through to this.
+const devanagari = Noto_Sans_Devanagari({
+  subsets: ["devanagari"],
+  display: "swap",
+  variable: "--font-devanagari",
+});
 
 export const metadata: Metadata = {
   title: "BharaTransit — Delhi pilot",
@@ -18,7 +37,7 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en">
+    <html lang="en" className={`${archivo.variable} ${devanagari.variable}`}>
       <body className="bg-slate-50 font-sans text-slate-900 antialiased flex flex-col min-h-screen">
         <header className="border-b border-slate-200 bg-white">
           <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3">

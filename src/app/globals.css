@@ -1,10 +1,64 @@
 @import "tailwindcss";
 
+/* ---------------------------------------------------------------- tokens
+   Mirrors src/lib/tokens.ts. Both files are checked against each other by
+   tests/design-rules.test.ts, so edit them together. */
+:root {
+  --bt-ink: #131a22;
+  --bt-ink-2: #38434f;
+  --bt-ink-3: #606b76;
+  --bt-paper: #f5f3ef;
+  --bt-surface: #ffffff;
+  --bt-rule: #d9d5cc;
+  --bt-saffron: #da601a;
+  --bt-live: #0c7946;
+  --bt-stale: #975a00;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bt-ink: #edeae3;
+    --bt-ink-2: #a8b0b8;
+    --bt-ink-3: #848e98;
+    --bt-paper: #10151a;
+    --bt-surface: #182029;
+    --bt-rule: #2a343e;
+    --bt-saffron: #ff8a3d;
+    --bt-live: #28a96a;
+    --bt-stale: #e09a20;
+  }
+}
+
+:root[data-theme="dark"] {
+  --bt-ink: #edeae3;
+  --bt-ink-2: #a8b0b8;
+  --bt-ink-3: #848e98;
+  --bt-paper: #10151a;
+  --bt-surface: #182029;
+  --bt-rule: #2a343e;
+  --bt-saffron: #ff8a3d;
+  --bt-live: #28a96a;
+  --bt-stale: #e09a20;
+}
+
+/* Mapping the tokens through @theme means every colour utility flips with the
+   cascade. No component needs a dark: variant. */
 @theme {
-  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
-    "Noto Sans", "Noto Sans Devanagari", sans-serif;
-  --color-saffron: #ff9933;
-  --color-indiagreen: #138808;
+  --font-sans: var(--font-archivo), var(--font-devanagari), ui-sans-serif,
+    system-ui, "Segoe UI", Roboto, sans-serif;
+
+  --color-ink: var(--bt-ink);
+  --color-ink-2: var(--bt-ink-2);
+  --color-ink-3: var(--bt-ink-3);
+  --color-paper: var(--bt-paper);
+  --color-surface: var(--bt-surface);
+  --color-rule: var(--bt-rule);
+  --color-saffron: var(--bt-saffron);
+  --color-live: var(--bt-live);
+  --color-stale: var(--bt-stale);
+
+  --radius-none: 0;
+  --radius-control: 2px;
 }
 
 html,
@@ -12,12 +66,63 @@ body {
   min-height: 100%;
 }
 
+body {
+  background-color: var(--bt-paper);
+  color: var(--bt-ink);
+}
+
+/* ------------------------------------------------------------ type roles
+   Four voices, one variable family. The width axis is what separates the
+   Display and Data voices; see spec section 4. */
+.type-display {
+  font-stretch: 118%;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: -0.01em;
+  line-height: 1.05;
+}
+
+.type-data {
+  font-stretch: 88%;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0;
+}
+
+.type-body {
+  font-stretch: 100%;
+  font-weight: 400;
+  line-height: 1.5;
+}
+
+.type-micro {
+  font-stretch: 100%;
+  font-weight: 600;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+/* --------------------------------------------------------------- hatch
+   The "not real" treatment: DEMO provenance and walk segments. The single
+   gradient the negative rules permit (spec section 7). */
+.hatch {
+  background-image: repeating-linear-gradient(
+    45deg,
+    color-mix(in srgb, var(--bt-ink) 14%, transparent) 0 3px,
+    transparent 3px 6px
+  );
+}
+
 /* MapLibre popup styling to match the design system */
 .maplibregl-popup-content {
-  border-radius: 0.75rem !important;
+  border-radius: 2px !important;
   padding: 0.5rem 0.75rem !important;
   font-size: 0.8125rem;
-  box-shadow: 0 4px 16px rgb(15 23 42 / 0.18) !important;
+  background: var(--bt-surface) !important;
+  color: var(--bt-ink) !important;
+  border: 1px solid var(--bt-rule) !important;
+  box-shadow: none !important;
 }
 .maplibregl-popup-tip {
   border-width: 6px !important;
