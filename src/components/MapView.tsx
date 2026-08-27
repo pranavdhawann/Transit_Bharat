@@ -24,7 +24,8 @@ function legsToGeojson(legs: Leg[]) {
       .map((leg) => ({
         type: "Feature" as const,
         properties: {
-          color: leg.mode === "WALK" ? "#64748b" : (leg.routeColor ?? "#2563eb"),
+          // MapLibre paint is evaluated by the GL renderer, so it cannot read CSS custom properties.
+          color: leg.mode === "WALK" ? "#606B76" : (leg.routeColor ?? "#606B76"),
           kind: leg.mode === "WALK" ? "walk" : "transit",
           name:
             leg.mode === "WALK"
@@ -152,8 +153,8 @@ export default function MapView({
           filter: ["==", ["get", "kind"], "walk"],
           layout: { "line-cap": "round", "line-join": "round" },
           paint: {
-            "line-color": ["get", "color"],
-            "line-width": 3,
+            "line-color": "#606B76",
+            "line-width": 2,
             "line-dasharray": [1.5, 1.5],
           },
         });
@@ -165,8 +166,8 @@ export default function MapView({
           layout: { "line-cap": "round", "line-join": "round" },
           paint: {
             "line-color": ["get", "color"],
-            "line-width": 5,
-            "line-opacity": 0.9,
+            "line-width": 6,
+            "line-opacity": 1,
           },
         });
 
@@ -177,8 +178,8 @@ export default function MapView({
           source: "tb-stops",
           paint: {
             "circle-radius": 5,
-            "circle-color": "#ffffff",
-            "circle-stroke-color": "#334155",
+            "circle-color": "#F5F3EF",
+            "circle-stroke-color": "#131A22",
             "circle-stroke-width": 2,
           },
         });
@@ -189,7 +190,7 @@ export default function MapView({
           type: "circle",
           source: "tb-vehicles",
           filter: ["==", ["get", "selected"], 1],
-          paint: { "circle-radius": 14, "circle-color": "#3b82f6", "circle-opacity": 0.25 },
+          paint: { "circle-radius": 14, "circle-color": "#606B76", "circle-opacity": 0.3 },
         });
         map.addLayer({
           id: "tb-vehicle-dot",
@@ -197,8 +198,8 @@ export default function MapView({
           source: "tb-vehicles",
           paint: {
             "circle-radius": ["case", ["==", ["get", "selected"], 1], 9, 7],
-            "circle-color": "#ffffff",
-            "circle-stroke-color": "#1d4ed8",
+            "circle-color": "#F5F3EF",
+            "circle-stroke-color": "#131A22",
             "circle-stroke-width": 3.5,
           },
         });
@@ -383,7 +384,7 @@ export default function MapView({
 
   return (
     <div
-      className={`relative overflow-hidden rounded-xl border border-slate-200 ${className}`}
+      className={`relative overflow-hidden rounded-[2px] border border-rule ${className}`}
     >
       <div
         ref={containerRef}
@@ -392,12 +393,12 @@ export default function MapView({
         role="application"
       />
       {!ready && (
-        <div className="absolute inset-0 flex items-center justify-center bg-slate-100 text-sm text-slate-400">
+        <div className="absolute inset-0 flex items-center justify-center bg-paper text-sm text-ink-3">
           Loading map…
         </div>
       )}
       {tilesFailed && (
-        <div className="absolute inset-x-0 bottom-0 bg-white/95 px-3 py-2 text-xs text-slate-600">
+        <div className="absolute inset-x-0 bottom-0 bg-surface px-3 py-2 text-xs text-ink-2">
           Map tiles are unavailable right now — journey directions remain fully
           usable.
         </div>
