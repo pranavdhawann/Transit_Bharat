@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import Link from "next/link";
 import { Archivo, Noto_Sans_Devanagari } from "next/font/google";
+import Wordmark from "@/components/Wordmark";
 import "./globals.css";
 
 // Archivo is a true variable font on Google Fonts (weight 100-900, width
@@ -30,7 +31,10 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  themeColor: "#0f172a",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#F5F3EF" },
+    { media: "(prefers-color-scheme: dark)", color: "#10151A" },
+  ],
 };
 
 export default function RootLayout({
@@ -38,58 +42,56 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en" className={`${archivo.variable} ${devanagari.variable}`}>
-      <body className="bg-slate-50 font-sans text-slate-900 antialiased flex flex-col min-h-screen">
-        <header className="border-b border-slate-200 bg-white">
-          <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3">
-            <Link href="/" className="flex items-center gap-2 rounded focus-visible:outline-2 focus-visible:outline-blue-600">
-              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-900 text-sm font-bold text-white">
-                TB
-              </span>
-              <span className="text-lg font-semibold tracking-tight">
-                BharaTransit
-              </span>
+      <body className="bg-paper type-body text-ink antialiased flex min-h-screen flex-col">
+        <div aria-hidden className="h-[3px] bg-saffron" />
+        <header className="border-b border-rule bg-surface">
+          <div className="mx-auto flex h-12 max-w-6xl items-center justify-between px-4">
+            <Link href="/" className="focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-saffron">
+              <Wordmark />
             </Link>
-            <p className="hidden text-xs text-slate-500 sm:block">
+            <p className="type-micro text-ink-3">
               Delhi pilot ·{" "}
-              <Link
-                href="/about"
-                className="underline hover:text-slate-700"
-              >
+              <Link href="/about" className="underline hover:text-ink">
                 How it&apos;s built
               </Link>
             </p>
           </div>
         </header>
 
-        <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-6">
+        <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6">
           {children}
         </main>
 
-        <footer className="border-t border-slate-200 bg-white">
-          <div className="mx-auto max-w-5xl space-y-1 px-4 py-4 text-xs text-slate-500">
-            <p>
-              Independent hackathon prototype. Not affiliated with any
-              government body. No official endorsement implied.
-            </p>
-            <p>
-              Network geometry ©{" "}
-              <a
-                className="underline hover:text-slate-700"
-                href="https://www.openstreetmap.org/copyright"
-                target="_blank"
-                rel="noreferrer"
-              >
-                OpenStreetMap contributors
-              </a>{" "}
-              · Tiles by OpenFreeMap · Curated prototype network inspired by
-              Delhi corridors.
-            </p>
-            <p>
-              Vehicle positions shown as{" "}
-              <span className="font-semibold text-violet-700">DEMO</span> are
-              synthetic realtime data generated for this prototype only.
-            </p>
-          </div>
+        <footer className="border-t border-rule bg-surface">
+          <details className="mx-auto max-w-6xl px-4 py-3" open>
+            <summary className="type-micro cursor-pointer text-ink-3">
+              Disclaimers and data sources
+            </summary>
+            <div className="space-y-1 py-2 text-xs text-ink-3">
+              <p>
+                Independent hackathon prototype. Not affiliated with any
+                government body. No official endorsement implied.
+              </p>
+              <p>
+                Network geometry ©{" "}
+                <a
+                  className="underline hover:text-ink"
+                  href="https://www.openstreetmap.org/copyright"
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  OpenStreetMap contributors
+                </a>{" "}
+                · Tiles by OpenFreeMap · Curated prototype network inspired by
+                Delhi corridors.
+              </p>
+              <p>
+                Vehicle positions shown as{" "}
+                <span className="font-semibold text-ink-2">DEMO</span> are
+                synthetic realtime data generated for this prototype only.
+              </p>
+            </div>
+          </details>
         </footer>
       </body>
     </html>
