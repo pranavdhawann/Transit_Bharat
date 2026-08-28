@@ -61,6 +61,9 @@ describe("voice trip transcription route", () => {
     expect(init.headers).toEqual({ Authorization: "Bearer test-key-not-a-secret" });
     const upstream = init.body as FormData;
     expect(upstream.get("model")).toBe("gpt-transcribe");
+    expect(upstream.getAll("languages[]")).toEqual(["hi", "en"]);
+    expect(upstream.getAll("keywords[]")).toContain("Connaught Place");
+    expect(String(upstream.get("prompt"))).toContain("Hinglish");
     expect(upstream.get("file")).toBeInstanceOf(File);
   });
 

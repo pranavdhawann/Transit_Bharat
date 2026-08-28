@@ -28,8 +28,13 @@ export async function POST(request: Request) {
     return NextResponse.json({ scenario: resetDisruption() });
   }
 
-  // Default (and only supported demo event): trigger the scripted delay on
-  // the primary corridor.
+  if (body.action !== "trigger") {
+    return NextResponse.json(
+      { error: "BAD_ACTION", message: "Use action 'trigger' or 'reset'." },
+      { status: 400 },
+    );
+  }
+
   return NextResponse.json({
     scenario: triggerDisruption(
       typeof body.routeNumber === "string" ? body.routeNumber : undefined,

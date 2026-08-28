@@ -101,4 +101,64 @@ describe("journey API coordinate endpoints", () => {
       "NRI Complex scriptalert(1)/script",
     );
   });
+
+  it("rejects valid coordinates outside the Delhi NCR pilot area", async () => {
+    const response = await POST(
+      new Request("http://localhost/api/journeys", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          fromLocation: { lat: 19.076, lon: 72.8777 },
+          toId: "lm:connaught-place",
+        }),
+      }),
+    );
+    const data = (await response.json()) as { error?: string };
+    expect(response.status).toBe(422);
+    expect(data.error).toBe("OUTSIDE_SERVICE_AREA");
+  });
+
+  it("rejects the same start and destination", async () => {
+    const response = await POST(
+      new Request("http://localhost/api/journeys", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          fromId: "lm:connaught-place",
+          toId: "lm:connaught-place",
+        }),
+      }),
+    );
+    const data = (await response.json()) as { error?: string };
+    expect(response.status).toBe(400);
+    expect(data.error).toBe("SAME_PLACE");
+  });
+
+  it("echoes and explains an accessibility-aware plan", async () => {
+    const response = await POST(
+      new Request("http://localhost/api/journeys", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          fromId: "lm:munirka-market",
+          toId: "lm:connaught-place",
+          accessibilityNeed: "WHEELCHAIR",
+          maxTransfers: 1,
+        }),
+      }),
+    );
+    const data = (await response.json()) as {
+      journeys?: Array<{ query?: { accessibilityNeed?: string } }>;
+      accessibility?: { requested: string; applied: string[]; warnings: string[] };
+    };
+    expect(response.status).toBe(200);
+    expect(data.journeys?.[0]?.query?.accessibilityNeed).toBe("WHEELCHAIR");
+    expect(data.accessibility?.requested).toBe("WHEELCHAIR");
+    expect(data.accessibility?.applied).toContain(
+      "Ordinary auto-rickshaw fallback disabled",
+    );
+    expect(data.accessibility?.warnings.join(" ")).toContain(
+      "cannot be verified",
+    );
+  });
 });

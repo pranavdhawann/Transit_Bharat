@@ -480,17 +480,24 @@ export default function MapView({
       typeof window !== "undefined" &&
       !window.matchMedia("(min-width: 1024px)").matches;
     const basePadding = focusLegIndex === null ? 56 : 42;
+    const mapRect = map.getContainer().getBoundingClientRect();
     const hiddenBottom = mobileOverlay
       ? (() => {
-          const rect = map.getContainer().getBoundingClientRect();
           const sheetTop =
             window.innerHeight *
             (1 - Math.min(0.85, Math.max(0, occludedBottomFraction)));
           // The map can extend below the viewport, so a percentage of map
           // height under-counts what the fixed sheet actually covers.
-          return Math.max(0, Math.round(rect.bottom - sheetTop));
+          return Math.max(0, Math.round(mapRect.bottom - sheetTop));
         })()
       : 0;
+    const availableHeight = mapRect.height - hiddenBottom;
+    if (
+      availableHeight <= basePadding * 2 ||
+      mapRect.width <= basePadding * 2
+    ) {
+      return;
+    }
     map.fitBounds(
       [
         [minLon, minLat],
@@ -520,7 +527,7 @@ export default function MapView({
         ref={containerRef}
         className="h-full w-full"
         aria-label="Journey map"
-        role="application"
+        role="region"
       />
       {!ready && (
         <div className="absolute inset-0 flex items-center justify-center bg-paper text-sm text-ink-3">

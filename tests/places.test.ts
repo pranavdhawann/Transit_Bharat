@@ -56,6 +56,7 @@ describe("place index coverage", () => {
 
   it("matches Hindi aliases", () => {
     expect(searchPlaces("चांदनी चौक").length).toBeGreaterThan(0);
+    expect(searchPlaces("मुनीरका")[0]?.id).toBe("lm:munirka-market");
   });
 
   it("returns popular places for an empty query via suggestedPlaces", () => {

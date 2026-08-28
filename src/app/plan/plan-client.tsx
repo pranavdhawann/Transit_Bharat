@@ -2,12 +2,13 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import BottomSheet, { type Snap } from "@/components/BottomSheet";
 import JourneyTimeline from "@/components/JourneyTimeline";
 import LangToggle from "@/components/LangToggle";
 import MapView from "@/components/MapView";
 import RouteCard from "@/components/RouteCard";
+import { isAccessibilityNeed } from "@/lib/ai";
 import { fmtAge } from "@/lib/format";
 import { journeyEndpointFor } from "@/lib/current-location";
 import { useNow, useVehicles } from "@/lib/hooks";
@@ -19,7 +20,12 @@ import {
   scenarioQuery,
 } from "@/lib/scenario-client";
 import type { DisruptionNote } from "@/lib/explain";
-import type { Journey, ScenarioState, Vehicle } from "@/lib/types";
+import type {
+  AccessibilityPlanInfo,
+  Journey,
+  ScenarioState,
+  Vehicle,
+} from "@/lib/types";
 
 /** The one control treatment on this page: 2px radius, rule border, ink label. */
 const CONTROL =
@@ -36,11 +42,17 @@ export default function PlanClient() {
     maxTransfersParam !== null && /^[0-4]$/.test(maxTransfersParam)
       ? Number(maxTransfersParam)
       : null;
+  const accessibilityNeed = isAccessibilityNeed(params.get("access"))
+    ? params.get("access")
+    : null;
   const [lang] = useLang();
   const selParam = params.get("sel");
 
   const [journeys, setJourneys] = useState<Journey[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [accessibility, setAccessibility] =
+    useState<AccessibilityPlanInfo | null>(null);
+  const plannerAbortRef = useRef<AbortController | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(selParam);
   // Seeded from sessionStorage so the delay survives a reload or a trip
   // through GO mode; the server is stateless about it by design.
@@ -51,10 +63,15 @@ export default function PlanClient() {
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<DisruptionNote | null>(null);
   // Mobile only: the sheet is a static column at lg and above.
-  const [snap, setSnap] = useState<Snap>("half");
+  const [snap, setSnap] = useState<Snap>("peek");
 
   const fetchJourneys = useCallback(async () => {
+    plannerAbortRef.current?.abort();
+    const controller = new AbortController();
+    plannerAbortRef.current = controller;
     setError(null);
+    setJourneys(null);
+    setAccessibility(null);
     const fromEndpoint = journeyEndpointFor(fromId);
     const toEndpoint = journeyEndpointFor(toId);
     if (!fromEndpoint || !toEndpoint) {
@@ -77,25 +94,41 @@ export default function PlanClient() {
             : { toId: toEndpoint.id }),
           lessWalking,
           ...(maxTransfers !== null ? { maxTransfers } : {}),
+          ...(accessibilityNeed ? { accessibilityNeed } : {}),
           scenario: loadScenario(),
         }),
+        signal: controller.signal,
       });
-      if (!res.ok) throw new Error("planning failed");
       const data = (await res.json()) as {
-        journeys: Journey[];
-        scenario: ScenarioState;
+        journeys?: Journey[];
+        scenario?: ScenarioState;
+        accessibility?: AccessibilityPlanInfo | null;
+        message?: string;
       };
-      setJourneys(data.journeys);
+      if (!res.ok || !data.journeys || !data.scenario) {
+        throw new Error(data.message || "Could not plan this journey.");
+      }
+      if (controller.signal.aborted) return;
+      const plannedJourneys = data.journeys;
+      setJourneys(plannedJourneys);
       setScenario(data.scenario);
+      setAccessibility(data.accessibility ?? null);
       saveScenario(data.scenario);
-      setSelectedId((cur) => cur ?? data.journeys[0]?.id ?? null);
-    } catch {
-      setError("Could not plan a route between these places.");
+      setSelectedId((cur) => cur ?? plannedJourneys[0]?.id ?? null);
+    } catch (fetchError) {
+      if (controller.signal.aborted) return;
+      setJourneys([]);
+      setError(
+        fetchError instanceof Error
+          ? fetchError.message
+          : "Could not plan a route between these places.",
+      );
     }
-  }, [fromId, toId, lessWalking, maxTransfers]);
+  }, [fromId, toId, lessWalking, maxTransfers, accessibilityNeed]);
 
   useEffect(() => {
     void fetchJourneys();
+    return () => plannerAbortRef.current?.abort();
   }, [fetchJourneys]);
 
   const selected = useMemo(
@@ -162,22 +195,50 @@ export default function PlanClient() {
     return best;
   }, [selected, vehicles]);
 
+  const demoBusRoute = useMemo(
+    () =>
+      selected?.legs.find((leg) => leg.mode === "BUS")?.routeNumber ??
+      journeys
+        ?.flatMap((journey) => journey.legs)
+        .find((leg) => leg.mode === "BUS")?.routeNumber ??
+      null,
+    [journeys, selected],
+  );
+
   async function triggerDisruption() {
+    if (!demoBusRoute) {
+      setError("No bus route is available for this delay demo.");
+      return;
+    }
     setBusy(true);
+    setError(null);
     try {
       const res = await fetch("/api/demo/disruption", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           action: "trigger",
+          routeNumber: demoBusRoute,
           delayMinutes: 11,
         }),
       });
-      const data = (await res.json()) as { scenario: ScenarioState };
+      const data = (await res.json()) as {
+        scenario?: ScenarioState;
+        message?: string;
+      };
+      if (!res.ok || !data.scenario) {
+        throw new Error(data.message || "Could not start the delay demo.");
+      }
       saveScenario(data.scenario);
       setScenario(data.scenario);
       setSelectedId(null);
       await fetchJourneys();
+    } catch (triggerError) {
+      setError(
+        triggerError instanceof Error
+          ? triggerError.message
+          : "Could not start the delay demo.",
+      );
     } finally {
       setBusy(false);
     }
@@ -210,15 +271,34 @@ export default function PlanClient() {
     const qs = new URLSearchParams({ sel: selected.id, from: fromId, to: toId });
     if (lessWalking) qs.set("lessWalk", "1");
     if (maxTransfers !== null) qs.set("maxTransfers", String(maxTransfers));
+    if (accessibilityNeed) qs.set("access", accessibilityNeed);
     router.push("/go?" + qs.toString());
   }
 
+  const disruptionNoteInput = useMemo(() => {
+    const disrupted = journeys?.find((journey) => journey.disrupted);
+    const alternative = journeys?.find((journey) => !journey.disrupted);
+    if (!scenario?.active || !disrupted || !alternative) return null;
+    return {
+      disrupted,
+      alternative,
+      key: [
+        scenario.triggeredAt,
+        scenario.routeNumber,
+        scenario.delayMinutes,
+        disrupted.id,
+        disrupted.durationMinutes,
+        alternative.id,
+        alternative.durationMinutes,
+      ].join(":"),
+    };
+  }, [journeys, scenario]);
+
   // Plain-language explanation of the delay, phrased by the model from the
-  // planner's own numbers. Never blocks the cards from rendering.
+  // planner's own numbers. Geometry enrichment keeps the same semantic key,
+  // so it does not accidentally issue and bill a duplicate model request.
   useEffect(() => {
-    const disrupted = journeys?.find((j) => j.disrupted);
-    const alternative = journeys?.find((j) => !j.disrupted);
-    if (!scenario?.active || !disrupted || !alternative) {
+    if (!disruptionNoteInput) {
       setNote(null);
       return;
     }
@@ -229,8 +309,8 @@ export default function PlanClient() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            disrupted,
-            alternative,
+            disrupted: disruptionNoteInput.disrupted,
+            alternative: disruptionNoteInput.alternative,
             scenario: loadScenario(),
           }),
         });
@@ -244,7 +324,10 @@ export default function PlanClient() {
     return () => {
       cancelled = true;
     };
-  }, [journeys, scenario]);
+    // The semantic key deliberately excludes asynchronously enriched map
+    // geometry. See comment above.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [disruptionNoteInput?.key]);
 
   if (!fromId || !toId) {
     return (
@@ -293,7 +376,9 @@ export default function PlanClient() {
           ) : (
             <button
               onClick={() => void triggerDisruption()}
-              disabled={busy}
+              disabled={
+                busy || !demoBusRoute
+              }
               className={`${CONTROL} disabled:opacity-50`}
             >
               Simulate delay (demo)
@@ -301,6 +386,24 @@ export default function PlanClient() {
           )}
         </div>
       </div>
+
+      {accessibility && (
+        <section
+          aria-label="Accessibility planning status"
+          role="status"
+          className="border border-rule bg-surface p-3 text-sm text-ink-2"
+        >
+          <p className="font-semibold text-ink">
+            Mobility preferences applied
+          </p>
+          <p className="mt-1">{accessibility.applied.join(" · ")}</p>
+          {accessibility.warnings.map((warning) => (
+            <p key={warning} className="mt-1 text-stale">
+              {warning}
+            </p>
+          ))}
+        </section>
+      )}
 
       <div className="lg:grid lg:grid-cols-[minmax(0,26rem)_1fr] lg:items-start lg:gap-5">
         {/* Mobile: the three-snap sheet over the map. Desktop: the static
@@ -331,8 +434,8 @@ export default function PlanClient() {
 
             {journeys && journeys.length === 0 && (
               <p className="border border-rule bg-surface p-4 text-sm text-ink-2">
-                No route found between these places on the Delhi pilot network
-                yet. Try one of the suggested demo journeys.
+                No suitable route was found between these places on the Delhi
+                pilot network. Try a nearby station or adjust your preferences.
               </p>
             )}
 
@@ -413,7 +516,7 @@ function LiveStrip({ vehicle }: { vehicle: Vehicle }) {
     // badge and walk segments: synthetic data never looks like measured data.
     <div className="hatch flex flex-wrap items-center gap-x-2 gap-y-1 border border-rule bg-paper px-3 py-2 text-sm text-ink-2">
       <span className="type-micro text-ink">
-        DEMO LIVE &middot; bus {vehicle.routeNumber}-{vehicle.id.split("-")[1]}
+        DEMO vehicle &middot; bus {vehicle.routeNumber}-{vehicle.id.split("-")[1]}
       </span>
       <span>updated {fmtAge(ageSec)}</span>
       <span>

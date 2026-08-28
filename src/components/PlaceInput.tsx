@@ -38,10 +38,12 @@ export default function PlaceInput({
   const [kind, setKind] = useState<ListKind>("suggestions");
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [searchError, setSearchError] = useState(false);
   const [activeIdx, setActiveIdx] = useState(-1);
   const boxRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
   // Responses can land out of order; only the newest request may set state.
   const reqSeq = useRef(0);
   // Set when the rider types over an existing selection. That keystroke clears
@@ -73,14 +75,22 @@ export default function PlaceInput({
   useEffect(() => {
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
+      abortRef.current?.abort();
     };
   }, []);
 
   const fetchList = useCallback(async (q: string) => {
     const seq = ++reqSeq.current;
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
     setLoading(true);
+    setSearchError(false);
     try {
-      const res = await fetch(`/api/places?q=${encodeURIComponent(q)}`);
+      const res = await fetch(`/api/places?q=${encodeURIComponent(q)}`, {
+        signal: controller.signal,
+      });
+      if (!res.ok) throw new Error("place search failed");
       const data = (await res.json()) as {
         results?: PlaceResult[];
         kind?: ListKind;
@@ -91,10 +101,13 @@ export default function PlaceInput({
       setKind(data.kind ?? (q.trim() ? "results" : "suggestions"));
       setActiveIdx(list.length ? 0 : -1);
       setOpen(true);
-    } catch {
+    } catch (error) {
+      if (controller.signal.aborted) return;
       if (seq !== reqSeq.current) return;
       setResults([]);
       setActiveIdx(-1);
+      setSearchError(true);
+      setOpen(true);
     } finally {
       if (seq === reqSeq.current) setLoading(false);
     }
@@ -107,7 +120,11 @@ export default function PlaceInput({
       // An empty box asks for popular places; a single character is too
       // ambiguous to search on, so we keep the current list until there are two.
       if (trimmed.length > 0 && trimmed.length < MIN_QUERY) {
-        setOpen(true);
+        abortRef.current?.abort();
+        setResults([]);
+        setActiveIdx(-1);
+        setOpen(false);
+        setSearchError(false);
         return;
       }
       debounceRef.current = setTimeout(() => void fetchList(q), DEBOUNCE_MS);
@@ -126,6 +143,7 @@ export default function PlaceInput({
     if (debounceRef.current) clearTimeout(debounceRef.current);
     onSelect(null);
     setText("");
+    setSearchError(false);
     void fetchList("");
   }
 
@@ -209,8 +227,6 @@ export default function PlaceInput({
             } else if (e.key === "Escape") {
               e.preventDefault();
               setOpen(false);
-            } else if (e.key === "Tab" && activeIdx >= 0 && results[activeIdx]) {
-              choose(results[activeIdx]);
             }
           }}
         />
@@ -230,9 +246,23 @@ export default function PlaceInput({
             onClick={onUseCurrentLocation}
             disabled={locationBusy}
             aria-label={`Use current location for ${label}`}
-            className="type-micro shrink-0 rounded-[2px] border border-rule bg-paper px-2 py-1 text-ink hover:bg-surface focus-visible:outline-2 focus-visible:outline-saffron disabled:cursor-wait disabled:opacity-60"
+            className="inline-flex min-h-9 shrink-0 items-center gap-1 rounded-[2px] border border-rule bg-paper px-2 py-1 text-xs font-semibold text-ink hover:bg-surface focus-visible:outline-2 focus-visible:outline-saffron disabled:cursor-wait disabled:opacity-60"
           >
-            {locationBusy ? "Locating…" : "Use current location"}
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              aria-hidden="true"
+            >
+              <circle cx="12" cy="12" r="3" />
+              <path d="M12 2v3M12 19v3M2 12h3M19 12h3" />
+            </svg>
+            <span className="hidden sm:inline">
+              {locationBusy ? "Locating…" : "My location"}
+            </span>
           </button>
         )}
       </div>
@@ -286,8 +316,9 @@ export default function PlaceInput({
           </ul>
           {showEmptyState && (
             <p className="px-3 py-3 text-sm text-ink-3">
-              No Delhi stop, landmark or address matches that. Add a locality or
-              postcode and try again.
+              {searchError
+                ? "Place search is temporarily unavailable. Check your connection and try again."
+                : "No Delhi stop, landmark or address matches that. Add a locality or postcode and try again."}
             </p>
           )}
           {results.some((r) => r.type === "address") && (
@@ -296,6 +327,11 @@ export default function PlaceInput({
             </p>
           )}
         </div>
+      )}
+      {loading && (
+        <p className="mt-1 px-1 text-xs text-ink-3" role="status">
+          Searching places…
+        </p>
       )}
     </div>
   );

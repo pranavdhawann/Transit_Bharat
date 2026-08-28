@@ -35,12 +35,23 @@ export interface TripPreferences {
    * A stated access need. Mapped to concrete routing constraints - it never
    * changes what the router reports, only what it is asked for.
    */
-  accessibilityNeed:
-    | "WHEELCHAIR"
-    | "HEAVY_LUGGAGE"
-    | "WITH_CHILD"
-    | "SENIOR"
-    | null;
+  accessibilityNeed: AccessibilityNeed | null;
+}
+
+export const ACCESSIBILITY_NEEDS = [
+  "WHEELCHAIR",
+  "STEP_FREE",
+  "LIMITED_MOBILITY",
+  "HEAVY_LUGGAGE",
+  "WITH_CHILD",
+  "SENIOR",
+  "PREGNANT",
+] as const;
+
+export type AccessibilityNeed = (typeof ACCESSIBILITY_NEEDS)[number];
+
+export function isAccessibilityNeed(value: unknown): value is AccessibilityNeed {
+  return ACCESSIBILITY_NEEDS.includes(value as AccessibilityNeed);
 }
 
 /** Why we did not use the model. Surfaced to the client on purpose. */
@@ -103,9 +114,9 @@ const SCHEMA = {
     },
     accessibilityNeed: {
       type: ["string", "null"],
-      enum: ["WHEELCHAIR", "HEAVY_LUGGAGE", "WITH_CHILD", "SENIOR", null],
+      enum: [...ACCESSIBILITY_NEEDS, null],
       description:
-        "A stated access need: a wheelchair user, heavy bags, travelling with a small child, or an elderly traveller. Null unless the user says so.",
+        "A stated access need: wheelchair, step-free/no-stairs, limited mobility, heavy bags, stroller/small child, elderly traveller, or pregnancy. Null unless the user says so.",
     },
   },
 } as const;
@@ -113,7 +124,8 @@ const SCHEMA = {
 const SYSTEM_PROMPT = `You extract public-transport preferences for an Indian city journey planner.
 Extract ONLY what the user explicitly says. Delhi-area spellings vary (e.g. "CP", "Connaught Place").
 Users may write in English, Hindi, or a mix of both (Hinglish); handle all three.
-An access need is only set when the user states it ("wheelchair", "with a toddler", "carrying heavy bags", "elderly parent").
+Map wheelchair use to WHEELCHAIR; no stairs, lifts, ramps, or step-free access to STEP_FREE; difficulty walking or a mobility impairment to LIMITED_MOBILITY; a stroller or small child to WITH_CHILD; an elderly companion to SENIOR; and pregnancy to PREGNANT.
+"Minimal walking" alone is a LOW walking preference, not a medical claim.
 Never invent places that were not mentioned. Reply via the structured format only.`;
 
 type ExtractOutcome =
@@ -219,7 +231,9 @@ async function extractWithOpenAI(text: string): Promise<ExtractOutcome> {
           p.maxTransfers >= 0
             ? Math.min(4, Math.round(p.maxTransfers))
             : null,
-        accessibilityNeed: p.accessibilityNeed ?? null,
+        accessibilityNeed: isAccessibilityNeed(p.accessibilityNeed)
+          ? p.accessibilityNeed
+          : null,
       },
     };
   } catch {
@@ -229,46 +243,58 @@ async function extractWithOpenAI(text: string): Promise<ExtractOutcome> {
 
 /** Transparent keyword fallback - deterministic and inspectable. */
 export function heuristic(text: string): TripPreferences {
-  const t = text.toLowerCase();
-
-  // Cut time/deadline clauses out of the primary place-extraction text.
-  const placesPart = t.split(/\b(?:before|by|till|until|around)\b/)[0];
-  const leadVerb = /^(?:reach|towards|going to|head(?:ing)? to)\s+/;
+  const t = text.normalize("NFKC").toLowerCase().replace(/\s+/g, " ").trim();
+  const placesPart = stripPreferenceClauses(t);
 
   let originText: string | null = null;
   let destinationText: string | null = null;
 
   const fromTo = placesPart.match(/\bfrom\s+(.+?)\s+\bto\b\s+(.+)$/);
-  const toFrom = placesPart.match(/\bto\s+(.+?)\s+\bfrom\b\s+(.+)$/);
+  const toFrom = placesPart.match(
+    /(?:\b(?:reach|go(?:ing)?|head(?:ing)?)(?:\s+to)?\s+|\bto\s+)(.+?)\s+\bfrom\b\s+(.+)$/,
+  );
+  const hindiFromTo = placesPart.match(/(.+?)\s+(?:से|\bse\b)\s+(.+)$/u);
+  const arrowOrBareTo = placesPart.match(/(.+?)\s+(?:→|->|\bto\b)\s+(.+)$/u);
   if (fromTo) {
-    originText = fromTo[1].trim();
-    destinationText = fromTo[2].trim();
+    originText = cleanPlaceText(fromTo[1]);
+    destinationText = cleanPlaceText(fromTo[2]);
   } else if (toFrom) {
-    destinationText = toFrom[1].replace(leadVerb, "").trim();
-    originText = toFrom[2].trim();
+    destinationText = cleanPlaceText(toFrom[1]);
+    originText = cleanPlaceText(toFrom[2]);
+  } else if (hindiFromTo) {
+    originText = cleanPlaceText(hindiFromTo[1]);
+    destinationText = cleanPlaceText(hindiFromTo[2]);
+  } else if (arrowOrBareTo) {
+    originText = cleanPlaceText(arrowOrBareTo[1]);
+    destinationText = cleanPlaceText(arrowOrBareTo[2]);
   } else {
     const dest =
       placesPart.match(/\b(?:to|towards)\s+(.+)$/)?.[1] ??
       placesPart.match(/\breach\s+(.+)$/)?.[1] ??
+      placesPart.match(/(?:मुझे|हमको|मेरे को)?\s*(.+?)\s+(?:जाना|जाना है|पहुँचना|पहुंचना)(?:\s+है)?$/u)?.[1] ??
       null;
     if (dest) {
       const parts = dest.split(/\bfrom\b/);
-      destinationText = parts[0].replace(leadVerb, "").trim() || null;
-      if (parts.length > 1) originText = parts[1].trim() || null;
+      destinationText = cleanPlaceText(parts[0]);
+      if (parts.length > 1) originText = cleanPlaceText(parts[1]);
     }
   }
 
   // Origin may live after a time clause ("by 10 am from munirka").
   if (!originText) {
-    originText = t.match(/\bfrom\s+([^,.!?]+)$/)?.[1]?.trim() ?? null;
+    originText = cleanPlaceText(
+      t.match(/\bfrom\s+([^,.!?]+)$/)?.[1] ?? "",
+    );
   }
 
-  const timeMatch = t.match(/\b(\d{1,2})(?::(\d{2}))?\s*(a\.?m\.?|p\.?m\.?)?\b/);
+  const timeMatch = t.match(
+    /\b(\d{1,2})(?::(\d{2}))?\s*(a\.?m\.?|p\.?m\.?|सुबह|दोपहर|शाम|रात)?(?:\s*बजे)?/u,
+  );
   let arriveByTime: string | null = null;
-  if (timeMatch && /(before|by|till|until)/.test(t)) {
+  if (timeMatch && /(before|by|till|until|तक|पहले|baje tak)/u.test(t)) {
     let h = parseInt(timeMatch[1], 10);
     const m = timeMatch[2] ? parseInt(timeMatch[2], 10) : 0;
-    const pm = /p\.?m\.?/.test(timeMatch[3] ?? "");
+    const pm = /p\.?m\.?|दोपहर|शाम|रात/u.test(timeMatch[3] ?? "");
     if (pm && h < 12) h += 12;
     if (!pm && h === 12) h = 0;
     if (h >= 0 && h <= 23 && m >= 0 && m <= 59) {
@@ -278,15 +304,16 @@ export function heuristic(text: string): TripPreferences {
 
   const accessibilityNeed = detectAccessNeed(t);
 
-  const walkingPreference =
-    /less walk|minimal walk|avoid walk|no walk|cannot walk|can't walk|senior|pregnan/.test(
-      t,
-    ) || accessibilityNeed !== null
+  const walkingPreference = /happy to walk|don't mind walking|can walk more/.test(t)
+    ? ("HIGH" as const)
+    : /(?:less|minimal|minimum|avoid|reduce|no)\s+walk|cannot walk|can't walk|difficulty walking|walk nahi|paidal kam|kam paidal|कम पैदल|कम चल|चलने में (?:दिक्कत|परेशानी)|ज़्यादा नहीं चल/u.test(
+          t,
+        ) || accessibilityNeed !== null
       ? ("LOW" as const)
       : null;
 
   // "direct", "no changes", "without changing" all mean zero interchanges.
-  const maxTransfers = /\bdirect\b|no change|without chang|one bus|single bus|seedha/.test(t)
+  const maxTransfers = /\bdirect\b|no change|without chang|one bus|single bus|seedha|सीधा|बिना बदले/u.test(t)
     ? 0
     : /one change|single change|at most one/.test(t)
       ? 1
@@ -302,12 +329,51 @@ export function heuristic(text: string): TripPreferences {
   };
 }
 
+function stripPreferenceClauses(text: string): string {
+  return text
+    .replace(
+      /[,;]?(?:\s+(?:before|by|till|until|around)\s+\d.*|\s+\d{1,2}(?::\d{2})?\s*(?:baje\s+tak|बजे\s+तक).*)$/u,
+      "",
+    )
+    .replace(
+      /[,;]?(?:\s+(?:with|for)\s+(?:a\s+)?(?:wheelchair|stroller|elderly|senior).*)$/u,
+      "",
+    )
+    .trim();
+}
+
+function cleanPlaceText(value: string): string | null {
+  const cleaned = value
+    .replace(
+      /^(?:(?:i am|i'm|as a)\s+)?(?:a\s+)?(?:disabled|divyang|viklang|दिव्यांग|विकलांग)(?:\s+(?:passenger|travell?er|person|यात्री))?\s+(?:ko\s+|को\s+)?/u,
+      "",
+    )
+    .replace(
+      /^(?:please\s+)?(?:i\s+(?:need|want|have)\s+to\s+(?:reach\s+)?|need\s+to\s+(?:reach\s+)?|want\s+to\s+(?:reach\s+)?|going\s+to\s+|reach\s+|mujhe\s+|mere\s+ko\s+|मुझे\s+|मेरे\s+को\s+|हमको\s+)/u,
+      "",
+    )
+    .replace(
+      /\s+(?:जाना(?:\s+है)?|jana(?:\s+hai)?|jaana(?:\s+hai)?|पहुँचना(?:\s+है)?|पहुंचना(?:\s+है)?|pahunchna(?:\s+hai)?|तक|tak)(?:\s.*)?$/u,
+      "",
+    )
+    .replace(
+      /[,;]?(?:\s+(?:wheelchair|wheel chair|step[- ]?free|no stairs|seedhi|stairs? use nahi|minimal walking|less walking|cannot walk|can't walk|difficulty walking|with (?:an? )?(?:elderly|senior|stroller)|व्हीलचेयर|बिना सीढ़|कम पैदल).*)$/u,
+      "",
+    )
+    .replace(/^[\s,.;:!?-]+|[\s,.;:!?-]+$/g, "")
+    .trim();
+  return cleaned || null;
+}
+
 /** Keyword detection for stated access needs, English and common Hindi. */
 function detectAccessNeed(t: string): TripPreferences["accessibilityNeed"] {
-  if (/wheelchair|wheel chair|व्हीलचेयर|divyang|disabled/.test(t)) return "WHEELCHAIR";
+  if (/wheelchair|wheel chair|व्हीलचेयर|व्हील चेयर/u.test(t)) return "WHEELCHAIR";
+  if (/step[- ]?free|no stairs?|cannot use stairs?|can't use stairs?|avoid stairs?|stairs? use nahi|seedhi (?:use )?nahi|accessible stations?|lift access|elevator access|बिना सीढ़|सीढ़ी नहीं|लिफ्ट चाहिए/u.test(t)) return "STEP_FREE";
+  if (/difficulty walking|limited mobility|mobility issue|walking impairment|cannot walk|can't walk|\b(?:disabled|divyang|viklang)\b|दिव्यांग|विकलांग|चलने में (?:दिक्कत|परेशानी)|ज़्यादा नहीं चल/u.test(t)) return "LIMITED_MOBILITY";
   if (/luggage|suitcase|heavy bag|saman|सामान|trolley/.test(t)) return "HEAVY_LUGGAGE";
   if (/toddler|infant|baby|small child|pram|stroller|बच्च/.test(t)) return "WITH_CHILD";
-  if (/senior|elderly|old (?:mother|father|parent)|बुज़ुर्ग|budhe/.test(t)) return "SENIOR";
+  if (/senior|elderly|old (?:mother|father|parent)|बुज़ुर्ग|बुजुर्ग|budhe|buzurg/u.test(t)) return "SENIOR";
+  if (/pregnan|गर्भवती|गर्भावस्था/u.test(t)) return "PREGNANT";
   return null;
 }
 
@@ -319,16 +385,11 @@ export function constraintsFor(prefs: TripPreferences): {
   lessWalking: boolean;
   maxTransfers: number | null;
 } {
+  const need = prefs.accessibilityNeed ?? null;
   const lessWalking =
-    prefs.walkingPreference === "LOW" || prefs.accessibilityNeed !== null;
-  // A wheelchair user, someone with heavy bags or a small child pays a far
-  // higher price per interchange than an average rider.
-  const needCap =
-    prefs.accessibilityNeed === "WHEELCHAIR" ||
-    prefs.accessibilityNeed === "HEAVY_LUGGAGE" ||
-    prefs.accessibilityNeed === "WITH_CHILD"
-      ? 1
-      : null;
+    prefs.walkingPreference === "LOW" || need !== null;
+  // Every supported mobility profile makes interchanges materially harder.
+  const needCap = need !== null ? 1 : null;
   const maxTransfers =
     prefs.maxTransfers !== null && needCap !== null
       ? Math.min(prefs.maxTransfers, needCap)

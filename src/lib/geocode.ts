@@ -1,12 +1,5 @@
 import type { PlaceResult } from "./types";
-
-/** Broad Delhi/NCR guardrail; results outside this box are never offered. */
-const DELHI_BOUNDS = {
-  minLat: 28.30,
-  maxLat: 29.05,
-  minLon: 76.80,
-  maxLon: 77.60,
-};
+import { DELHI_BOUNDS } from "./service-area";
 
 const DEFAULT_GEOCODER_URL = "https://photon.komoot.io/api/";
 const USER_AGENT =
@@ -44,7 +37,7 @@ export async function searchGeocodedPlaces(
   const url = new URL(base);
   url.searchParams.set("q", q);
   url.searchParams.set("limit", String(Math.min(10, Math.max(1, limit))));
-  url.searchParams.set("lang", "en");
+  url.searchParams.set("lang", /[\u0900-\u097f]/u.test(q) ? "hi" : "en");
   url.searchParams.set("lat", "28.6139");
   url.searchParams.set("lon", "77.2090");
   url.searchParams.set(

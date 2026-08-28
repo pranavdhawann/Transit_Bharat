@@ -59,13 +59,34 @@ describe("scenario state is instance-independent", () => {
       "delayed",
       42,
       {},
-      { active: false, routeNumber: "620U", delayMinutes: 11 },
       { active: true, routeNumber: "", delayMinutes: 11 },
       { active: true, routeNumber: "620U", delayMinutes: 0 },
       { active: true, routeNumber: "620U", delayMinutes: Number.NaN },
     ]) {
       expect(parseScenario(bad), JSON.stringify(bad) ?? "undefined").toBeNull();
     }
+  });
+
+  it("honours an explicit inactive state instead of leaking server state", () => {
+    triggerDisruption(PRIMARY_BUS_NUMBER, 11);
+    const resolved = resolveScenario({
+      active: false,
+      routeNumber: "620U",
+      delayMinutes: 11,
+    });
+    expect(resolved.active).toBe(false);
+    resetDisruption();
+  });
+
+  it("rejects timestamps suspiciously far in the future", () => {
+    expect(
+      parseScenario({
+        active: true,
+        routeNumber: "620U",
+        delayMinutes: 11,
+        triggeredAt: Date.now() + 61_000,
+      }),
+    ).toBeNull();
   });
 
   it("clamps an absurd delay rather than trusting it", () => {

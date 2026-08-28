@@ -1,19 +1,25 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import LangToggle from "@/components/LangToggle";
 import PlaceInput from "@/components/PlaceInput";
 import ProvenanceBadge from "@/components/ProvenanceBadge";
 import VoiceTripButton from "@/components/VoiceTripButton";
-import { constraintsFor, type PreferencesResult } from "@/lib/ai";
+import {
+  ACCESSIBILITY_NEEDS,
+  constraintsFor,
+  heuristic,
+  type AccessibilityNeed,
+  type PreferencesResult,
+} from "@/lib/ai";
 import {
   currentLocationPlace,
   saveCurrentLocation,
   saveSelectedPlace,
 } from "@/lib/current-location";
 import { t, useLang } from "@/lib/i18n";
-import { SUGGESTED_PAIRS } from "@/lib/places";
+import { isWithinDelhiServiceArea } from "@/lib/service-area";
 import type { PlaceResult } from "@/lib/types";
 
 type PrefsResponse = PreferencesResult & { error?: string };
@@ -33,6 +39,19 @@ const NEED_COPY: Record<string, string> = {
   HEAVY_LUGGAGE: "heavy luggage",
   WITH_CHILD: "travelling with a child",
   SENIOR: "senior traveller",
+  STEP_FREE: "step-free travel",
+  LIMITED_MOBILITY: "limited mobility",
+  PREGNANT: "pregnancy",
+};
+
+const ACCESS_OPTIONS: Record<AccessibilityNeed, string> = {
+  WHEELCHAIR: "Wheelchair user",
+  STEP_FREE: "Step-free / no stairs",
+  LIMITED_MOBILITY: "Difficulty walking",
+  HEAVY_LUGGAGE: "Heavy luggage",
+  WITH_CHILD: "Travelling with a stroller or child",
+  SENIOR: "Travelling with an elderly person",
+  PREGNANT: "Pregnancy",
 };
 
 export default function HomePage() {
@@ -42,18 +61,39 @@ export default function HomePage() {
   const [to, setTo] = useState<PlaceResult | null>(null);
   const [lessWalking, setLessWalking] = useState(false);
   const [maxTransfers, setMaxTransfers] = useState<number | null>(null);
+  const [accessibilityNeed, setAccessibilityNeed] =
+    useState<AccessibilityNeed | null>(null);
   const [nlText, setNlText] = useState("");
   const [nlBusy, setNlBusy] = useState(false);
   const [nlNote, setNlNote] = useState<string | null>(null);
   const [locationBusy, setLocationBusy] = useState(false);
   const [locationMessage, setLocationMessage] = useState<string | null>(null);
   const [locationError, setLocationError] = useState(false);
+  const [tripError, setTripError] = useState<string | null>(null);
+  const parseSeqRef = useRef(0);
+  const voiceStartRef = useRef<{ context: string; parseSeq: number } | null>(
+    null,
+  );
+  const voiceContext = JSON.stringify([
+    from?.id ?? null,
+    to?.id ?? null,
+    lessWalking,
+    maxTransfers,
+    accessibilityNeed,
+    nlText,
+  ]);
 
   function go(f: PlaceResult | null, t: PlaceResult | null) {
     if (!f || !t) return;
+    if (f.id === t.id) {
+      setTripError("Start and destination must be different places.");
+      return;
+    }
+    setTripError(null);
     const params = new URLSearchParams({ from: f.id, to: t.id });
     if (lessWalking) params.set("lessWalk", "1");
     if (maxTransfers !== null) params.set("maxTransfers", String(maxTransfers));
+    if (accessibilityNeed) params.set("access", accessibilityNeed);
     router.push(`/plan?${params.toString()}`);
   }
 
@@ -70,12 +110,19 @@ export default function HomePage() {
       return;
     }
     setFrom(place);
+    setTripError(null);
     if (place?.type !== "current") clearLocationStatus();
   }
 
   function selectTo(place: PlaceResult | null) {
-    if (place?.type === "address" && !saveSelectedPlace(place)) return;
+    if (place?.type === "address" && !saveSelectedPlace(place)) {
+      setTripError(
+        "This address could not be saved for route planning. Allow site storage and try again.",
+      );
+      return;
+    }
     setTo(place);
+    setTripError(null);
   }
 
   function useCurrentLocation() {
@@ -90,6 +137,14 @@ export default function HomePage() {
     navigator.geolocation.getCurrentPosition(
       (position) => {
         const place = currentLocationPlace(position.coords);
+        if (!isWithinDelhiServiceArea(place)) {
+          setLocationBusy(false);
+          setLocationError(true);
+          setLocationMessage(
+            "Your current location is outside the Delhi NCR pilot area.",
+          );
+          return;
+        }
         if (!saveCurrentLocation(place)) {
           setLocationBusy(false);
           setLocationError(true);
@@ -119,31 +174,39 @@ export default function HomePage() {
     );
   }
 
-  async function applyPair(fromId: string, toId: string) {
-    void (async () => {
-      const [fRes, tRes] = await Promise.all([
-        fetch(`/api/places?id=${encodeURIComponent(fromId)}`),
-        fetch(`/api/places?id=${encodeURIComponent(toId)}`),
-      ]);
-      const fData = (await fRes.json()) as { place: PlaceResult | null };
-      const tData = (await tRes.json()) as { place: PlaceResult | null };
-      setFrom(fData.place);
-      setTo(tData.place);
-      clearLocationStatus();
-    })();
-  }
-
-  async function parseTrip(text = nlText) {
-    if (text.trim().length < 4) return;
+  async function parseTrip(text = nlText, useLocalParser = false) {
+    if (text.trim().length < 4) {
+      setNlNote("Describe a journey or travel need first.");
+      return;
+    }
+    const seq = ++parseSeqRef.current;
     setNlBusy(true);
     setNlNote(null);
     try {
-      const res = await fetch("/api/ai/preferences", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text }),
-      });
-      const prefs = (await res.json()) as PrefsResponse;
+      let prefs: PrefsResponse;
+      if (useLocalParser) {
+        prefs = {
+          ...heuristic(text),
+          source: "heuristic",
+          fallbackReason: null,
+          fallbackDetail: null,
+          model: null,
+          latencyMs: null,
+        };
+      } else {
+        const res = await fetch("/api/ai/preferences", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text }),
+        });
+        prefs = (await res.json()) as PrefsResponse;
+        if (
+          !res.ok ||
+          (prefs.source !== "openai" && prefs.source !== "heuristic")
+        ) {
+          throw new Error("invalid preferences response");
+        }
+      }
 
       async function resolve(q: string | null): Promise<PlaceResult | null> {
         if (!q) return null;
@@ -156,6 +219,7 @@ export default function HomePage() {
         resolve(prefs.originText),
         resolve(prefs.destinationText),
       ]);
+      if (seq !== parseSeqRef.current) return;
       if (f) {
         setFrom(f);
         clearLocationStatus();
@@ -164,8 +228,18 @@ export default function HomePage() {
 
       // A stated access need becomes real routing constraints, not a label.
       const constraints = constraintsFor(prefs);
-      if (constraints.lessWalking) setLessWalking(true);
-      setMaxTransfers(constraints.maxTransfers);
+      if (prefs.accessibilityNeed) {
+        setAccessibilityNeed(prefs.accessibilityNeed);
+        setLessWalking(constraints.lessWalking);
+        setMaxTransfers(constraints.maxTransfers);
+      } else {
+        if (prefs.walkingPreference !== null) {
+          setLessWalking(prefs.walkingPreference === "LOW");
+        }
+        if (prefs.maxTransfers !== null) {
+          setMaxTransfers(prefs.maxTransfers);
+        }
+      }
 
       const parts: string[] = [];
       if (prefs.source === "openai") {
@@ -195,19 +269,23 @@ export default function HomePage() {
         );
       }
       if (prefs.arriveByTime)
-        parts.push(`deadline ${prefs.arriveByTime} noted (arrive-by coming soon)`);
+        parts.push(`arrival time ${prefs.arriveByTime} recognised · routes still leave now`);
       setNlNote(parts.join(" · "));
     } catch {
-      setNlNote("Could not parse that — please use the search boxes.");
+      if (seq === parseSeqRef.current) {
+        setNlNote("Could not understand that. Edit the text or use the search boxes.");
+      }
     } finally {
-      setNlBusy(false);
+      if (seq === parseSeqRef.current) setNlBusy(false);
     }
   }
 
   return (
     <div className="space-y-8">
       <section className="relative border border-rule bg-surface p-5 sm:p-8">
-        <LangToggle className="absolute right-4 top-4" />
+        <div className="mb-5 flex justify-end">
+          <LangToggle />
+        </div>
         <h1 className="type-display text-3xl sm:text-5xl">
           {t(lang, "heroTitle1")} {t(lang, "heroTitle2")}.
         </h1>
@@ -257,7 +335,73 @@ export default function HomePage() {
             </button>
           </div>
 
-          <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
+          <div className="border border-rule bg-paper p-3">
+            <label htmlFor="trip-description" className="type-micro text-ink-3">
+              Describe your trip or needs
+            </label>
+            <div className="relative mt-2">
+              <textarea
+                id="trip-description"
+                value={nlText}
+                onChange={(e) => setNlText(e.target.value)}
+                onKeyDown={(e) => {
+                   if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+                     e.preventDefault();
+                     if (nlBusy) return;
+                     void parseTrip();
+                  }
+                }}
+                rows={2}
+                placeholder="English, Hindi or Hinglish"
+                className="w-full resize-none border border-rule bg-surface px-3 py-2 pr-14 text-sm outline-none focus:outline-2 focus:outline-offset-[-2px] focus:outline-saffron"
+              />
+               <VoiceTripButton
+                 disabled={nlBusy}
+                 onRecordingStart={() => {
+                   voiceStartRef.current = {
+                     context: voiceContext,
+                     parseSeq: parseSeqRef.current,
+                   };
+                 }}
+                 onTranscript={(text) => {
+                   if (
+                     voiceStartRef.current?.parseSeq !== parseSeqRef.current ||
+                     voiceStartRef.current.context !== voiceContext
+                   ) {
+                     setNlNote(
+                       "Voice transcript was not applied because the trip changed while it was processing.",
+                     );
+                     return;
+                   }
+                   voiceStartRef.current = null;
+                   setNlText(text);
+                  setNlNote(null);
+                  // Transcription already used the speech model. Constraint
+                  // extraction is deterministic locally, avoiding a second
+                  // paid model request for the same utterance.
+                  return parseTrip(text, true);
+                }}
+              />
+            </div>
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => void parseTrip()}
+                disabled={nlBusy || nlText.trim().length < 4}
+                className="rounded-[2px] border border-rule bg-surface px-3 py-1.5 text-sm font-semibold text-ink hover:border-ink focus-visible:outline-2 focus-visible:outline-saffron disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                {nlBusy ? "Understanding…" : "Apply"}
+              </button>
+              <span className="text-[11px] text-ink-3">Ctrl + Enter</span>
+            </div>
+            {nlNote && (
+              <p className="mt-2 text-xs text-ink-3" role="status">
+                {nlNote}
+              </p>
+            )}
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3 pt-1">
             <label className="flex cursor-pointer items-center gap-2 text-sm text-ink-3">
               <input
                 type="checkbox"
@@ -267,10 +411,40 @@ export default function HomePage() {
               />
               {t(lang, "lessWalking")}
             </label>
-            <span className="rounded-[2px] bg-paper px-3 py-1 text-xs text-ink-3">
+            <label className="flex items-center gap-2 text-sm text-ink-3">
+              <span>Journey needs</span>
+              <select
+                value={accessibilityNeed ?? ""}
+                onChange={(e) => {
+                  const value = e.target.value as AccessibilityNeed | "";
+                  setAccessibilityNeed(value || null);
+                  if (value) {
+                    setLessWalking(true);
+                    setMaxTransfers((current) => current ?? 1);
+                  } else {
+                    setMaxTransfers(null);
+                  }
+                }}
+                className="max-w-full rounded-[2px] border border-rule bg-surface px-2 py-1 text-sm text-ink"
+              >
+                <option value="">No specific access need</option>
+                {ACCESSIBILITY_NEEDS.map((need) => (
+                  <option key={need} value={need}>
+                    {ACCESS_OPTIONS[need]}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <span className="ml-auto rounded-[2px] bg-paper px-3 py-1 text-xs text-ink-3">
               {t(lang, "leaveNow")}
             </span>
           </div>
+
+          {tripError && (
+            <p role="alert" className="text-sm text-stale">
+              {tripError}
+            </p>
+          )}
 
           <button
             type="submit"
@@ -281,55 +455,6 @@ export default function HomePage() {
           </button>
         </form>
 
-        <div className="mt-5">
-          <p className="type-micro text-ink-3">
-            Try a demo journey
-          </p>
-          <div className="mt-2 flex flex-wrap gap-2">
-            {SUGGESTED_PAIRS.map((pair) => (
-              <button
-                key={pair.label}
-                type="button"
-                onClick={() => applyPair(pair.fromId, pair.toId)}
-                className="rounded-[2px] border border-rule bg-paper px-3 py-1.5 text-sm text-ink hover:border-ink focus-visible:outline-2 focus-visible:outline-saffron"
-              >
-                {pair.label}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <details className="group mt-5 border border-rule bg-paper p-4">
-          <summary className="cursor-pointer list-none text-sm font-semibold text-ink marker:hidden">
-            <span className="mr-2 inline-block h-2 w-2 bg-saffron align-middle" aria-hidden />
-            Or just describe your trip <span className="font-normal text-ink-3">(beta)</span>
-          </summary>
-          <div className="mt-3 space-y-2">
-            <textarea
-              value={nlText}
-              onChange={(e) => setNlText(e.target.value)}
-              rows={2}
-              placeholder='e.g. "Need to reach Nehru Place from Munirka before 10 am, cannot walk much"'
-              className="w-full resize-none border border-rule bg-surface px-3 py-2 text-sm outline-none focus:outline-2 focus:outline-offset-[-2px] focus:outline-saffron"
-              aria-label="Describe your trip in plain language"
-            />
-            <VoiceTripButton
-              disabled={nlBusy}
-              onTranscript={(text) => {
-                setNlText(text);
-                setNlNote(null);
-                return parseTrip(text);
-              }}
-            />
-            {nlNote && (
-              <p className="text-xs text-ink-3" role="status">{nlNote}</p>
-            )}
-            <p className="text-[11px] text-ink-3">
-              AI only extracts your constraints. Routes, fares and times are
-              always computed by the deterministic planner.
-            </p>
-          </div>
-        </details>
       </section>
 
       <section aria-labelledby="trust-heading" className="border border-rule bg-surface">

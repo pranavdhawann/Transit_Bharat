@@ -1,3 +1,5 @@
+import type { AccessibilityNeed } from "./ai";
+
 export type Mode = "WALK" | "AUTO" | "BUS" | "SUBWAY";
 
 /**
@@ -60,7 +62,15 @@ export interface JourneyQuery {
   toId?: string;
   fromLocation?: JourneyLocation;
   toLocation?: JourneyLocation;
-  maxWalkMeters?: number;
+  lessWalking?: boolean;
+  maxTransfers?: number;
+  accessibilityNeed?: AccessibilityNeed;
+}
+
+export interface AccessibilityPlanInfo {
+  requested: AccessibilityNeed;
+  applied: string[];
+  warnings: string[];
 }
 
 export interface Journey {

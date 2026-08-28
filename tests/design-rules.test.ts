@@ -227,6 +227,18 @@ describe("migration is complete", () => {
   });
 });
 
+describe("mobile planner map visibility", () => {
+  it("opens the result sheet at peek so the route map remains usable", () => {
+    const source = readFileSync("src/app/plan/plan-client.tsx", "utf8");
+    expect(source).toContain('useState<Snap>("peek")');
+  });
+
+  it("does not fit a route into a canvas mostly hidden by the sheet", () => {
+    const source = readFileSync("src/components/MapView.tsx", "utf8");
+    expect(source).toContain("availableHeight <= basePadding * 2");
+  });
+});
+
 describe("token drift", () => {
   it("mirrors every token from tokens.ts into globals.css", () => {
     const css = readFileSync("src/app/globals.css", "utf8").toLowerCase();

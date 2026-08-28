@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import LangToggle from "@/components/LangToggle";
 import ModeIcon from "@/components/ModeIcon";
 import MapView from "@/components/MapView";
 import ProvenanceBadge from "@/components/ProvenanceBadge";
@@ -17,8 +16,12 @@ import {
 import { journeyEndpointFor } from "@/lib/current-location";
 import { useVehicles } from "@/lib/hooks";
 import { enrichJourneyGeometry } from "@/lib/route-geometry-client";
-import { loadScenario, scenarioQuery } from "@/lib/scenario-client";
-import type { Journey, Leg, Vehicle } from "@/lib/types";
+import {
+  loadScenario,
+  saveScenario,
+  scenarioQuery,
+} from "@/lib/scenario-client";
+import type { Journey, Leg, ScenarioState, Vehicle } from "@/lib/types";
 
 interface Boundary {
   start: number;
@@ -74,6 +77,9 @@ export default function GoClient() {
               lessWalking: params.get("lessWalk") === "1",
               ...(params.get("maxTransfers") !== null
                 ? { maxTransfers: Number(params.get("maxTransfers")) }
+                : {}),
+              ...(params.get("access")
+                ? { accessibilityNeed: params.get("access") }
                 : {}),
               scenario: loadScenario(),
             }),
@@ -138,12 +144,8 @@ function GoNavigator({ initialJourney }: { initialJourney: Journey }) {
     delayMin: number;
   } | null>(null);
   const [busy, setBusy] = useState(false);
+  const [actionMessage, setActionMessage] = useState<string | null>(null);
   const [trackedVehicleId, setTrackedVehicleId] = useState<string | null>(null);
-
-  useEffect(() => {
-    const t = setInterval(() => forceTick((n) => n + 1), 100);
-    return () => clearInterval(t);
-  }, []);
 
   useEffect(() => {
     if (journey.legs.every((leg) => leg.geometrySource)) return;
@@ -183,6 +185,12 @@ function GoNavigator({ initialJourney }: { initialJourney: Journey }) {
     ? boundaries.findIndex((b) => clampedNow >= b.start && clampedNow < b.end)
     : -1;
   const arrived = running && clampedNow >= jEnd;
+
+  useEffect(() => {
+    if (!running || arrived) return;
+    const t = setInterval(() => forceTick((n) => n + 1), 100);
+    return () => clearInterval(t);
+  }, [running, arrived]);
   const current = currentIdx >= 0 ? boundaries[currentIdx] : null;
   const travellerPosition = current
     ? {
@@ -298,8 +306,19 @@ function GoNavigator({ initialJourney }: { initialJourney: Journey }) {
   // Keyboard shortcuts: Space = advance, R = restart.
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
-      const tag = (e.target as HTMLElement)?.tagName;
-      if (tag === "INPUT" || tag === "TEXTAREA") return;
+      const target = e.target as HTMLElement | null;
+      const tag = target?.tagName;
+      if (
+        tag === "INPUT" ||
+        tag === "TEXTAREA" ||
+        tag === "BUTTON" ||
+        tag === "A" ||
+        tag === "SELECT" ||
+        tag === "SUMMARY" ||
+        target?.isContentEditable
+      ) {
+        return;
+      }
       if (e.code === "Space" || e.key === "ArrowRight") {
         e.preventDefault();
         advance();
@@ -312,13 +331,29 @@ function GoNavigator({ initialJourney }: { initialJourney: Journey }) {
   }, [advance, restart]);
 
   async function simulateDelay() {
+    const routeNumber =
+      current?.leg.mode === "BUS" ? current.leg.routeNumber : undefined;
+    if (!routeNumber) return;
     setBusy(true);
+    setActionMessage(null);
     try {
-      await fetch("/api/demo/disruption", {
+      const triggerResponse = await fetch("/api/demo/disruption", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "trigger", delayMinutes: 11 }),
+        body: JSON.stringify({
+          action: "trigger",
+          routeNumber,
+          delayMinutes: 11,
+        }),
       });
+      const triggerData = (await triggerResponse.json()) as {
+        scenario?: ScenarioState;
+        message?: string;
+      };
+      if (!triggerResponse.ok || !triggerData.scenario?.active) {
+        throw new Error(triggerData.message || "Could not start the delay demo.");
+      }
+      saveScenario(triggerData.scenario);
       const q = journey.query ?? {
         fromId: "",
         toId: "",
@@ -327,11 +362,17 @@ function GoNavigator({ initialJourney }: { initialJourney: Journey }) {
       const res = await fetch("/api/journeys", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...q, scenario: loadScenario() }),
+        body: JSON.stringify({ ...q, scenario: triggerData.scenario }),
       });
-      if (!res.ok) return;
-      const data = (await res.json()) as { journeys: Journey[] };
-      const disrupted = data.journeys.find((j) => j.disrupted) ?? journey;
+      const data = (await res.json()) as { journeys?: Journey[]; message?: string };
+      if (!res.ok || !data.journeys) {
+        throw new Error(data.message || "Could not recalculate the journey.");
+      }
+      const disrupted = data.journeys.find((j) => j.disrupted);
+      if (!disrupted) {
+        setActionMessage("The current route was not affected. Continue on this journey.");
+        return;
+      }
       const alt = data.journeys
         .filter((j) => !j.disrupted)
         .sort((a, b) => Date.parse(a.arriveAt) - Date.parse(b.arriveAt))[0];
@@ -348,6 +389,10 @@ function GoNavigator({ initialJourney }: { initialJourney: Journey }) {
       } else {
         setBanner({ altJourney: journey, savedMin: 0, delayMin });
       }
+    } catch (error) {
+      setActionMessage(
+        error instanceof Error ? error.message : "Could not simulate the delay.",
+      );
     } finally {
       setBusy(false);
     }
@@ -371,6 +416,9 @@ function GoNavigator({ initialJourney }: { initialJourney: Journey }) {
     } catch {
       // Current GO session remains usable.
     }
+    const next = new URLSearchParams(window.location.search);
+    next.set("sel", alt.id);
+    window.history.replaceState(null, "", `/go?${next.toString()}`);
   }
 
   function changeSpeed(nextSpeed: 1 | 30) {
@@ -404,9 +452,6 @@ function GoNavigator({ initialJourney }: { initialJourney: Journey }) {
           >
             &larr; Exit GO
           </Link>
-          {/* Riders often land straight in GO from a shared link, so the
-              language switch has to be reachable here too. */}
-          <LangToggle />
         </div>
         <span className="hatch type-micro border border-rule px-3 py-1 text-ink-2">
           Synthetic realtime data · DEMO
@@ -432,6 +477,13 @@ function GoNavigator({ initialJourney }: { initialJourney: Journey }) {
         <section className="overflow-hidden border border-rule bg-surface">
           {/* Instruction hero */}
           <div className="bg-ink px-5 py-6 text-paper sm:px-7">
+            <p className="sr-only" role="status" aria-live="polite">
+              {arrived
+                ? "You have reached your destination."
+                : current
+                  ? `${current.leg.mode} from ${current.leg.from.name} to ${current.leg.to.name}`
+                  : `Journey starts at ${fmtClockIST(journey.departAt)}`}
+            </p>
             {arrived ? (
               <>
                 <p className="type-micro text-saffron">
@@ -456,13 +508,15 @@ function GoNavigator({ initialJourney }: { initialJourney: Journey }) {
               aria-valuemax={100}
               aria-label="Journey progress"
             >
-              {journey.legs.map((_, i) => {
-                const legShare = 100 / journey.legs.length;
-                const filled = arrived || overallProgress >= (i + 1) * legShare;
-                const active = !filled && overallProgress > i * legShare;
+              {journey.legs.map((leg, i) => {
+                const legStart = boundaries[i]?.start ?? jStart;
+                const legEnd = boundaries[i]?.end ?? legStart;
+                const filled = arrived || clampedNow >= legEnd;
+                const active = !filled && clampedNow >= legStart;
                 return (
                   <span
                     key={i}
+                    style={{ flexGrow: Math.max(1, leg.durationMinutes) }}
                     className={`bt-animate h-1.5 flex-1 transition-colors ${
                       filled
                         ? "bg-paper"
@@ -561,6 +615,11 @@ function GoNavigator({ initialJourney }: { initialJourney: Journey }) {
                     Simulate delay (demo)
                   </button>
                 )}
+                {actionMessage && (
+                  <p className="w-full text-sm text-stale" role="status">
+                    {actionMessage}
+                  </p>
+                )}
                 {(journey.disrupted || banner) && (
                   <span className="type-micro ml-auto border border-stale bg-surface px-2 py-1 text-stale">
                     Delayed +{journey.legs.find((l) => l.delayMinutes)?.delayMinutes ?? banner?.delayMin} min
@@ -649,7 +708,7 @@ function Instruction({
           </h1>
           <p className="mt-1 flex flex-wrap items-center gap-2 text-sm text-paper">
             Board at {leg.from.name} · arrives {fmtClockIST(new Date(boundary.rideStart).toISOString())}
-            <ProvenanceBadge provenance="DEMO" suffix="live position" />
+            <ProvenanceBadge provenance={leg.provenance} suffix="arrival estimate" />
           </p>
         </>
       );

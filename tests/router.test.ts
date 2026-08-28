@@ -194,7 +194,7 @@ describe("deterministic router", () => {
     );
   });
 
-  it("returns empty when walking stays within the auto threshold", () => {
+  it("returns a direct walk instead of an empty state for a short trip", () => {
     // Off-network pair ~900 m apart (>300 m floor, walk well under 15 min).
     const journeys = planJourneys({
       origin: { name: "Far A", lat: 28.3, lon: 77.1 },
@@ -207,7 +207,9 @@ describe("deterministic router", () => {
     );
     expect(meters).toBeGreaterThan(300);
     expect((meters / 1000 / WALK_KMH) * 60).toBeLessThanOrEqual(15);
-    expect(journeys).toHaveLength(0);
+    expect(journeys).toHaveLength(1);
+    expect(journeys[0].fareInr).toBe(0);
+    expect(journeys[0].legs.every((leg) => leg.mode === "WALK")).toBe(true);
   });
 
   it("reports total walking distance as the sum of its walking legs", () => {

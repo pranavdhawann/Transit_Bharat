@@ -1,12 +1,20 @@
 import { NextResponse } from "next/server";
 import { getPlace } from "@/lib/places";
 import {
+  ACCESSIBLE_MAX_WALK_METERS,
   DEFAULT_MAX_WALK_METERS,
   LESS_WALK_MAX_METERS,
 } from "@/data/network";
+import { isAccessibilityNeed } from "@/lib/ai";
+import { haversineMeters } from "@/lib/geo";
 import { planJourneys } from "@/lib/graph";
 import { delayFrom, resolveScenario } from "@/lib/scenario";
-import type { Journey, JourneyLocation } from "@/lib/types";
+import { isWithinDelhiServiceArea } from "@/lib/service-area";
+import type {
+  AccessibilityPlanInfo,
+  Journey,
+  JourneyLocation,
+} from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -18,6 +26,7 @@ interface JourneysRequest {
   lessWalking?: boolean;
   /** Interchange cap from a stated accessibility constraint. */
   maxTransfers?: number;
+  accessibilityNeed?: unknown;
   /**
    * Demo scenario echoed back by the client. Serverless instances do not share
    * memory, so this - not server state - is what makes the delay demo reliable
@@ -51,38 +60,97 @@ export async function POST(request: Request) {
       { status: 400 },
     );
   }
+  if (!isWithinDelhiServiceArea(from) || !isWithinDelhiServiceArea(to)) {
+    return NextResponse.json(
+      {
+        error: "OUTSIDE_SERVICE_AREA",
+        message: "BharaTransit currently plans journeys only within Delhi NCR.",
+      },
+      { status: 422 },
+    );
+  }
+  if (haversineMeters(from, to) < 25) {
+    return NextResponse.json(
+      {
+        error: "SAME_PLACE",
+        message: "Your start and destination are the same place.",
+      },
+      { status: 400 },
+    );
+  }
 
   const scenario = resolveScenario(body.scenario);
   const delay = delayFrom(scenario);
+  const accessibilityNeed = isAccessibilityNeed(body.accessibilityNeed)
+    ? body.accessibilityNeed
+    : null;
+  const lessWalking = body.lessWalking === true || accessibilityNeed !== null;
+  const maxWalkMeters = accessibilityNeed
+    ? ACCESSIBLE_MAX_WALK_METERS
+    : lessWalking
+      ? LESS_WALK_MAX_METERS
+      : DEFAULT_MAX_WALK_METERS;
+  const maxTransfers =
+    typeof body.maxTransfers === "number" &&
+    Number.isFinite(body.maxTransfers) &&
+    body.maxTransfers >= 0
+      ? Math.min(4, Math.round(body.maxTransfers))
+      : undefined;
+  const requiresStepFree =
+    accessibilityNeed === "WHEELCHAIR" || accessibilityNeed === "STEP_FREE";
 
   const journeys: Journey[] = planJourneys({
     origin: { name: displayName(from), lat: from.lat, lon: from.lon },
     destination: { name: displayName(to), lat: to.lat, lon: to.lon },
-    maxWalkMeters: body.lessWalking
-      ? LESS_WALK_MAX_METERS
-      : DEFAULT_MAX_WALK_METERS,
+    maxWalkMeters,
+    ...(lessWalking ? { maxTotalWalkMeters: maxWalkMeters } : {}),
+    allowAutoAssist: !requiresStepFree,
     departAtMs: Date.now(),
     delay,
-    ...(typeof body.maxTransfers === "number" &&
-    Number.isFinite(body.maxTransfers) &&
-    body.maxTransfers >= 0
-      ? { maxTransfers: Math.min(4, Math.round(body.maxTransfers)) }
-      : {}),
+    ...(maxTransfers !== undefined ? { maxTransfers } : {}),
   }).map((j) => ({
     ...j,
     query: {
       ...(fromLocation ? { fromLocation } : { fromId: fromId! }),
       ...(toLocation ? { toLocation } : { toId: toId! }),
-      maxWalkMeters: body.lessWalking
-        ? LESS_WALK_MAX_METERS
-        : DEFAULT_MAX_WALK_METERS,
+      lessWalking,
+      ...(maxTransfers !== undefined ? { maxTransfers } : {}),
+      ...(accessibilityNeed ? { accessibilityNeed } : {}),
     },
   }));
+
+  const accessibility: AccessibilityPlanInfo | null = accessibilityNeed
+    ? {
+        requested: accessibilityNeed,
+        applied: [
+          `Shorter walking connections (target up to ${maxWalkMeters} m total)`,
+          ...(maxTransfers !== undefined
+            ? [`Up to ${maxTransfers} change${maxTransfers === 1 ? "" : "s"}`]
+            : []),
+          ...(requiresStepFree ? ["Ordinary auto-rickshaw fallback disabled"] : []),
+        ],
+        warnings: [
+          ...(maxTransfers !== undefined &&
+          journeys.some((journey) => journey.transfers > maxTransfers)
+            ? ["No available option met the requested change limit; closest routes are shown."]
+            : []),
+          ...(lessWalking && journeys.every((journey) => journey.walkingMeters > maxWalkMeters)
+            ? ["No available option met the walking target; closest routes are shown."]
+            : []),
+          ...(requiresStepFree
+            ? [
+                "Lift, ramp, platform-gap and outage data are not available in this pilot. Step-free access is requested but cannot be verified.",
+              ]
+            : []),
+        ],
+      }
+    : null;
 
   return NextResponse.json(
     {
       journeys,
       scenario,
+      accessibility,
       disclosure:
         "Schedule and vehicle data in this prototype are synthetic estimates (DEMO).",
     },

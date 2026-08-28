@@ -181,6 +181,18 @@ function rank(type: PlaceResult["type"]): number {
   return type === "station" ? 0 : type === "landmark" ? 1 : type === "address" ? 2 : 3;
 }
 
+/** True when the curated index already contains the exact spoken/typed name. */
+export function hasExactPlaceMatch(query: string): boolean {
+  index ??= buildIndex();
+  const q = norm(query);
+  if (!q) return false;
+  return index.some(
+    (record) =>
+      norm(record.name.replace(/^Bus:\s*/i, "")) === q ||
+      record.aliases.some((alias) => norm(alias) === q),
+  );
+}
+
 /**
  * Landmarks offered the moment a location field is focused, before the rider
  * has typed anything. Ordered by how likely they are to be a real trip end in

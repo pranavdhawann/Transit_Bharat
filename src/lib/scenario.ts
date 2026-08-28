@@ -52,6 +52,14 @@ export const MAX_DELAY_MINUTES = 60;
 export function parseScenario(input: unknown): ScenarioState | null {
   if (typeof input !== "object" || input === null) return null;
   const raw = input as Record<string, unknown>;
+  if (raw.active === false) {
+    return {
+      active: false,
+      triggeredAt: null,
+      routeNumber: null,
+      delayMinutes: 0,
+    };
+  }
   if (raw.active !== true) return null;
   const routeNumber =
     typeof raw.routeNumber === "string" && raw.routeNumber.length > 0
@@ -75,7 +83,8 @@ export function parseScenario(input: unknown): ScenarioState | null {
     typeof raw.triggeredAt === "number" && Number.isFinite(raw.triggeredAt)
       ? raw.triggeredAt
       : Date.now();
-  if (Date.now() - triggeredAt > EXPIRE_MS) return null;
+  const age = Date.now() - triggeredAt;
+  if (age > EXPIRE_MS || age < -60_000) return null;
   return { active: true, triggeredAt, routeNumber, delayMinutes };
 }
 
@@ -84,6 +93,14 @@ export function parseScenario(input: unknown): ScenarioState | null {
  * whatever this instance happens to remember.
  */
 export function resolveScenario(clientState?: unknown): ScenarioState {
+  if (clientState === null) {
+    return {
+      active: false,
+      triggeredAt: null,
+      routeNumber: null,
+      delayMinutes: 0,
+    };
+  }
   return parseScenario(clientState) ?? getScenario();
 }
 

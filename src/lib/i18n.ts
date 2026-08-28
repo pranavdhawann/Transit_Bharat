@@ -56,7 +56,6 @@ export const T: Dict = {
   findRoute: { en: "Find my route", hi: "मेरा रास्ता खोजें" },
   lessWalking: { en: "Less walking", hi: "कम पैदल चलना" },
   leaveNow: { en: "Leave now · Delhi pilot network", hi: "अभी चलें · दिल्ली पायलट" },
-  tryDemo: { en: "Try a demo journey", hi: "डेमो यात्रा आज़माएँ" },
   describeTrip: { en: "Or just describe your trip", hi: "या अपनी यात्रा बताइए" },
   trustHeading: {
     en: "Every arrival tells you how much to trust it",

@@ -162,7 +162,17 @@ export const LANDMARKS: Landmark[] = [
     name: "Connaught Place",
     lat: 28.6315,
     lon: 77.2167,
-    aliases: ["CP", "कनॉट प्लेस", "Rajiv Chowk", "Regal"],
+    aliases: [
+      "CP",
+      "कनॉट प्लेस",
+      "Rajiv Chowk",
+      "राजीव चौक",
+      "Conaught Place",
+      "Canaught Place",
+      "Cannot Place",
+      "kanot place",
+      "Regal",
+    ],
   },
   {
     id: "lm:india-gate",
@@ -211,21 +221,21 @@ export const LANDMARKS: Landmark[] = [
     name: "Munirka",
     lat: 28.558,
     lon: 77.1765,
-    aliases: ["Munirka Village", "मुनिरका"],
+    aliases: ["Munirka Village", "Munirka Market", "Munirkaa", "Muniraka", "मुनिरका", "मुनीरका"],
   },
   {
     id: "lm:nehru-place-market",
     name: "Nehru Place Tech Market",
     lat: 28.5495,
     lon: 77.251,
-    aliases: ["नेहरू प्लेस"],
+    aliases: ["Nehru Place", "Nehru Palace", "नेहरू प्लेस"],
   },
   {
     id: "lm:kashmere-gate-isbt",
     name: "Kashmere Gate ISBT",
     lat: 28.6672,
     lon: 77.2282,
-    aliases: ["ISBT", "कश्मीरी गेट"],
+    aliases: ["ISBT", "Kashmiri Gate", "Kashmir Gate", "कश्मीरी गेट"],
   },
   {
     id: "lm:lotus-temple",
@@ -239,7 +249,7 @@ export const LANDMARKS: Landmark[] = [
     name: "Hauz Khas Village",
     lat: 28.5535,
     lon: 77.1947,
-    aliases: ["HKV", "हौज़ ख़ास"],
+    aliases: ["HKV", "Hauz Khaz", "House Khas", "हौज़ ख़ास", "हौज खास"],
   },
   // ---- Pilot-area landmarks (added so search covers more than metro
   // stations). Coordinates for names that exist in the DMRC feed are taken
@@ -776,7 +786,10 @@ export function autoFare(km: number): number {
 }
 
 export const DEFAULT_MAX_WALK_METERS = 900;
-export const LESS_WALK_MAX_METERS = 800;
+/** A meaningful reduced-walking connector/transfer budget. */
+export const LESS_WALK_MAX_METERS = 600;
+/** Stronger per-connection budget for a stated mobility access need. */
+export const ACCESSIBLE_MAX_WALK_METERS = 400;
 /** Max meters between two stops to treat as an in-person walking transfer. */
 export const INTERCHANGE_WALK_MAX_METERS = 700;
 /** Max meters from an arbitrary origin/destination point to the network. */

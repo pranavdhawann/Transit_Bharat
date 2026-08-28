@@ -89,10 +89,11 @@ function buildGraph(maxWalkMeters: number) {
         const b = line.stations[i];
         const km =
           haversineMeters(a, b) / 1000;
-        for (const [u, v] of [
-          [a, b],
-          [b, a],
-        ]) {
+        const directions: Array<[StopRef, StopRef, string]> = [
+          [a, b, line.stations[line.stations.length - 1].name],
+          [b, a, line.stations[0].name],
+        ];
+        for (const [u, v, headsign] of directions) {
           pushEdge(u.id, {
             toId: v.id,
             mode: "SUBWAY",
@@ -100,7 +101,7 @@ function buildGraph(maxWalkMeters: number) {
             routeNumber: line.shortName,
             routeName: line.name,
             routeColor: line.color,
-            headsign: line.stations[line.stations.length - 1].name,
+            headsign,
             minutes: (km / line.speedKmh) * 60,
             km,
           });
@@ -116,10 +117,11 @@ function buildGraph(maxWalkMeters: number) {
         const a = route.stops[i - 1];
         const b = route.stops[i];
         const km = haversineMeters(a, b) / 1000;
-        for (const [u, v] of [
-          [a, b],
-          [b, a],
-        ]) {
+        const directions: Array<[StopRef, StopRef, string]> = [
+          [a, b, route.stops[route.stops.length - 1].name],
+          [b, a, route.stops[0].name],
+        ];
+        for (const [u, v, headsign] of directions) {
           // Central-Delhi traffic slows buses (see network.ts note).
           const midLat = (u.lat + v.lat) / 2;
           const speed =
@@ -133,7 +135,7 @@ function buildGraph(maxWalkMeters: number) {
             routeNumber: route.number,
             routeName: route.name,
             routeColor: route.color,
-            headsign: route.stops[route.stops.length - 1].name,
+            headsign,
             minutes: (km / speed) * 60,
             km,
           });
@@ -241,6 +243,7 @@ function dijkstra(
   profile: Profile,
   bannedRoutes: string[],
   delay: { routeNumber: string; minutes: number } | null,
+  maxTransfers?: number,
 ): RawEdgeUse[] | null {
   const best = new Map<string, Label>();
   const queue: { key: string; cost: number }[] = [];
@@ -316,11 +319,15 @@ function dijkstra(
         fare * profile.fareWeight;
 
       const nKey = stateKey(edge.toId, nextLastRoute);
+      const nextTransfers = label.transfers + (transferred ? 1 : 0);
+      if (typeof maxTransfers === "number" && nextTransfers > maxTransfers) {
+        continue;
+      }
       const nLabel: Label = {
         cost,
         timeMin: label.timeMin + edge.minutes + boardPenalty,
         fareInr: label.fareInr + fare,
-        transfers: label.transfers + (transferred ? 1 : 0),
+        transfers: nextTransfers,
         prevKey: cur.key,
         edgeUse: { edge, fromId: curStopId, boardPenalty, transferred, delayedBoard },
       };
@@ -445,16 +452,23 @@ function buildLegs(
     if (u.edge.mode === "WALK") {
       const pts: StopRef[] = [refOf(u.fromId)];
       let meters = 0;
+      let walkingMinutes = 0;
       let j = i;
       while (j < chain.length && chain[j].edge.mode === "WALK") {
         pts.push(refOf(chain[j].edge.toId));
         meters += chain[j].edge.km * 1000;
+        // Same-site interchanges intentionally carry a non-zero transfer
+        // time even when their mapped coordinates are identical.
+        walkingMinutes += chain[j].edge.minutes;
         j++;
       }
       const start = pts[0];
       const end = pts[pts.length - 1];
-      legs.push(walkLeg(start, end, meters, t));
-      t += (meters / 1000 / WALK_KMH) * 60 * 60000;
+      const leg = walkLeg(start, end, meters, t);
+      leg.durationMinutes = walkingMinutes;
+      leg.arriveAt = new Date(t + walkingMinutes * 60000).toISOString();
+      legs.push(leg);
+      t += walkingMinutes * 60000;
       i = j;
     } else {
       const routeEdges: RawEdgeUse[] = [];
@@ -585,7 +599,9 @@ function toJourney(
     departAt: legs[0].departAt,
     arriveAt: legs[legs.length - 1].arriveAt,
     durationMinutes,
-    fareInr: Math.round(legs.reduce((a, l) => a + (l.fareInr ?? 0), 0)),
+    // summarize() preserves one metro fare across a same-station line
+    // interchange. Summing display legs would incorrectly charge twice.
+    fareInr: Math.round(s.fareInr),
     // Sum from the built legs, not the graph chain: access/egress walks are
     // synthesized outside the chain, so chain-only totals miss them entirely.
     walkingMeters: Math.round(
@@ -845,6 +861,10 @@ export interface PlanInput {
    * satisfies it - a preference must never turn a usable answer into none.
    */
   maxTransfers?: number;
+  /** Soft total-walking cap used only for a rider-requested low-walk profile. */
+  maxTotalWalkMeters?: number;
+  /** Ordinary autos are not assumed wheelchair or step-free accessible. */
+  allowAutoAssist?: boolean;
   origin: Pt & { name: string };
   destination: Pt & { name: string };
   maxWalkMeters?: number;
@@ -855,9 +875,34 @@ export interface PlanInput {
 /** Plan up to three distinct itineraries: Recommended / Fastest / Cheapest. */
 export function planJourneys(input: PlanInput): Journey[] {
   const maxWalk = input.maxWalkMeters ?? DEFAULT_MAX_WALK_METERS;
-  buildGraph(Math.min(maxWalk, INTERCHANGE_WALK_MAX_METERS));
   const departAtMs = input.departAtMs ?? Date.now();
   const delay = input.delay ?? null;
+  const directMeters = haversineMeters(input.origin, input.destination);
+  const directWalkMinutes = (directMeters / 1000 / WALK_KMH) * 60;
+  if (
+    directWalkMinutes <= AUTO_WALK_THRESHOLD_MIN &&
+    (input.maxTotalWalkMeters === undefined ||
+      directMeters <= input.maxTotalWalkMeters)
+  ) {
+    const leg = walkLeg(input.origin, input.destination, directMeters, departAtMs);
+    return [
+      {
+        id: `jwalk${hash(`${input.origin.lat}:${input.origin.lon}:${input.destination.lat}:${input.destination.lon}`)}`,
+        label: "RECOMMENDED",
+        departAt: leg.departAt,
+        arriveAt: leg.arriveAt,
+        durationMinutes: leg.durationMinutes,
+        fareInr: 0,
+        walkingMeters: Math.round(directMeters),
+        transfers: 0,
+        legs: [leg],
+        provenance: "SCHEDULED",
+        disrupted: false,
+      },
+    ];
+  }
+
+  buildGraph(Math.min(maxWalk, INTERCHANGE_WALK_MAX_METERS));
 
   const connectorCap = input.autoAccess
     ? AUTO_ACCESS_MAX_METERS
@@ -870,6 +915,7 @@ export function planJourneys(input: PlanInput): Journey[] {
   );
   if (!startCandidates.length || !endCandidates.length) {
     if (input.autoAccess) return [];
+    if (input.allowAutoAssist === false) return [];
     return autoOnlyOptions(input, departAtMs);
   }
 
@@ -884,12 +930,24 @@ export function planJourneys(input: PlanInput): Journey[] {
     let bestCost = Infinity;
     for (const s of startCandidates) {
       for (const e of endCandidates) {
-        if (s.id === e.id) continue;
-        const chain = dijkstra(s.id, e.id, profile, bannedRoutes, delay);
+        if (s.ref.id === e.ref.id) continue;
+        const chain = dijkstra(
+          s.ref.id,
+          e.ref.id,
+          profile,
+          bannedRoutes,
+          delay,
+          input.maxTransfers,
+        );
         if (!chain || !chain.length) continue;
         const c = summarize(chain);
+        // Access and egress walks are synthesized after graph search, so add
+        // their real time here or a physically farther boarding stop can win
+        // while looking artificially free to the route selector.
+        const connectorMinutes =
+          ((s.distanceMeters + e.distanceMeters) / 1000 / WALK_KMH) * 60;
         const cost =
-          c.timeMin * profile.timeWeight +
+          (c.timeMin + connectorMinutes) * profile.timeWeight +
           c.transfers * profile.transferPenalty +
           c.fareInr * profile.fareWeight;
         if (cost < bestCost) {
@@ -940,7 +998,14 @@ export function planJourneys(input: PlanInput): Journey[] {
   }
 
   if (candidates.length === 0) {
+    // A hard interchange cap belongs in the search, not only in a final
+    // filter. If the network cannot satisfy it, preserve availability with a
+    // clearly detectable fallback that the API can label as unmet.
+    if (typeof input.maxTransfers === "number") {
+      return planJourneys({ ...input, maxTransfers: undefined });
+    }
     if (input.autoAccess) return [];
+    if (input.allowAutoAssist === false) return [];
     return autoOnlyOptions(input, departAtMs);
   }
 
@@ -1002,7 +1067,7 @@ export function planJourneys(input: PlanInput): Journey[] {
 
   // If the walk to or from the network is long, offer an auto-assisted variant
   // beside it rather than silently asking the rider for a 20-minute walk.
-  const assisted = labeled.some(needsAutoAssist)
+  const assisted = input.allowAutoAssist !== false && labeled.some(needsAutoAssist)
     ? autoAssistJourneys(input, labeled)
     : [];
   let finalSet = labeled;
@@ -1012,8 +1077,15 @@ export function planJourneys(input: PlanInput): Journey[] {
 
   // Apply the transfer cap before generating reasons, so comparative claims
   // ("cheapest") stay true within the set the rider is actually shown.
-  const capped = applyTransferCap(finalSet, input.maxTransfers);
+  const walkingCapped = applyWalkingCap(finalSet, input.maxTotalWalkMeters);
+  const capped = applyTransferCap(walkingCapped, input.maxTransfers);
   return capped.map((j) => ({ ...j, why: explainJourney(j, capped) }));
+}
+
+function applyWalkingCap(journeys: Journey[], maxMeters?: number): Journey[] {
+  if (typeof maxMeters !== "number") return journeys;
+  const within = journeys.filter((j) => j.walkingMeters <= maxMeters);
+  return within.length > 0 ? within : journeys;
 }
 
 /**
@@ -1062,11 +1134,16 @@ function explainJourney(j: Journey, all: Journey[]): string[] {
 }
 
 /** Network stops reachable on foot from an arbitrary point. */
+interface ConnectorCandidate {
+  ref: StopRef;
+  distanceMeters: number;
+}
+
 function connectorsNear(
   p: Pt,
   maxWalkMeters: number,
   hardCapMeters: number = CONNECTOR_MAX_METERS,
-): StopRef[] {
+): ConnectorCandidate[] {
   const out: { ref: StopRef; d: number }[] = [];
   for (const s of nodeCoords.values()) {
     const d = haversineMeters(p, s);
@@ -1075,5 +1152,5 @@ function connectorsNear(
     }
   }
   out.sort((a, b) => a.d - b.d);
-  return out.slice(0, 8).map((o) => o.ref);
+  return out.slice(0, 8).map((o) => ({ ref: o.ref, distanceMeters: o.d }));
 }
