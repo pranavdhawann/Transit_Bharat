@@ -1,10 +1,17 @@
 import { describe, expect, it } from "vitest";
 import { BUS_ROUTES } from "../src/data/network";
-import { simulateVehicles } from "../src/lib/vehicles";
+import { pingPongProgress, simulateVehicles } from "../src/lib/vehicles";
 
 const PRIMARY = BUS_ROUTES[0].number;
 
 describe("synthetic vehicle simulator", () => {
+  it("covers the full route before reversing direction", () => {
+    expect(pingPongProgress(0)).toEqual({ progress: 0, direction: 1 });
+    expect(pingPongProgress(0.25)).toEqual({ progress: 0.5, direction: 1 });
+    expect(pingPongProgress(0.5)).toEqual({ progress: 1, direction: -1 });
+    expect(pingPongProgress(0.75)).toEqual({ progress: 0.5, direction: -1 });
+  });
+
   it("emits DEMO-provenance vehicles with next stops", () => {
     const now = Date.now();
     const vehicles = simulateVehicles({ nowMs: now });

@@ -54,6 +54,18 @@ export interface SimulateOptions {
   delay?: { routeNumber: string; minutes: number } | null;
 }
 
+/** Convert one out-and-back cycle into a full 0..1 trip in either direction. */
+export function pingPongProgress(cycleProgress: number): {
+  progress: number;
+  direction: 1 | -1;
+} {
+  const wrapped = ((cycleProgress % 1) + 1) % 1;
+  if (wrapped < 0.5) {
+    return { progress: wrapped * 2, direction: 1 };
+  }
+  return { progress: (1 - wrapped) * 2, direction: -1 };
+}
+
 export function simulateVehicles(opts: SimulateOptions = {}): Vehicle[] {
   const nowMs = opts.nowMs ?? Date.now();
   const out: Vehicle[] = [];
@@ -72,13 +84,8 @@ export function simulateVehicles(opts: SimulateOptions = {}): Vehicle[] {
       const offsetMs =
         (v * cycleMs) / route.vehicles + (delayMin > 0 ? delayMin * 60_000 : 0);
       const phaseRaw = (((nowMs - offsetMs) % cycleMs) + cycleMs) % cycleMs / cycleMs;
-      // Ping-pong: forward then backward over the stop polyline.
-      let phase = phaseRaw;
-      let direction: 1 | -1 = 1;
-      if (phase >= 0.5) {
-        phase = 1 - phase;
-        direction = -1;
-      }
+      // Ping-pong over the FULL route. Each half of cycleMs is one direction.
+      const { progress: phase, direction } = pingPongProgress(phaseRaw);
       const pos = pointAlongFraction(
         route.stops.map((s) => [s.lat, s.lon] as [number, number]),
         phase,

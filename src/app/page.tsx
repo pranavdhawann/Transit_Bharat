@@ -5,6 +5,7 @@ import { useState } from "react";
 import LangToggle from "@/components/LangToggle";
 import PlaceInput from "@/components/PlaceInput";
 import ProvenanceBadge from "@/components/ProvenanceBadge";
+import VoiceTripButton from "@/components/VoiceTripButton";
 import { constraintsFor, type PreferencesResult } from "@/lib/ai";
 import {
   currentLocationPlace,
@@ -317,6 +318,13 @@ export default function HomePage() {
               placeholder='e.g. "Need to reach Nehru Place from Munirka before 10 am, cannot walk much"'
               className="w-full resize-none border border-rule bg-surface px-3 py-2 text-sm outline-none focus:outline-2 focus:outline-offset-[-2px] focus:outline-saffron"
               aria-label="Describe your trip in plain language"
+            />
+            <VoiceTripButton
+              disabled={nlBusy}
+              onTranscript={(text) => {
+                setNlText(text);
+                setNlNote(null);
+              }}
             />
             <div className="flex items-center gap-3">
               <button

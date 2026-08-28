@@ -138,9 +138,10 @@ function GoNavigator({ initialJourney }: { initialJourney: Journey }) {
     delayMin: number;
   } | null>(null);
   const [busy, setBusy] = useState(false);
+  const [trackedVehicleId, setTrackedVehicleId] = useState<string | null>(null);
 
   useEffect(() => {
-    const t = setInterval(() => forceTick((n) => n + 1), 500);
+    const t = setInterval(() => forceTick((n) => n + 1), 100);
     return () => clearInterval(t);
   }, []);
 
@@ -223,23 +224,47 @@ function GoNavigator({ initialJourney }: { initialJourney: Journey }) {
     scenarioQuery(loadScenario()),
   );
 
-  const trackedVehicle = useMemo(() => {
-    if (!current || current.leg.mode !== "BUS") return null;
+  useEffect(() => {
+    if (!current || current.leg.mode !== "BUS") {
+      setTrackedVehicleId(null);
+      return;
+    }
     const leg = current.leg;
-    const pool = vehicles.filter(
-      (v) => v.routeNumber === leg.routeNumber,
+    if (
+      trackedVehicleId &&
+      vehicles.some(
+        (vehicle) =>
+          vehicle.id === trackedVehicleId &&
+          vehicle.routeNumber === leg.routeNumber &&
+          (!leg.headsign || vehicle.headsign === leg.headsign),
+      )
+    ) {
+      return;
+    }
+    const sameDirection = vehicles.filter(
+      (vehicle) =>
+        vehicle.routeNumber === leg.routeNumber &&
+        (!leg.headsign || vehicle.headsign === leg.headsign),
     );
+    const pool = sameDirection.length
+      ? sameDirection
+      : vehicles.filter((vehicle) => vehicle.routeNumber === leg.routeNumber);
     let best: Vehicle | null = null;
     let bestD = Infinity;
-    for (const v of pool.length ? pool : vehicles) {
+    for (const v of pool) {
       const d = (v.lat - leg.from.lat) ** 2 + (v.lon - leg.from.lon) ** 2;
       if (d < bestD) {
         bestD = d;
         best = v;
       }
     }
-    return best;
-  }, [current, vehicles]);
+    setTrackedVehicleId(best?.id ?? null);
+  }, [current, trackedVehicleId, vehicles]);
+
+  const trackedVehicle = useMemo(
+    () => vehicles.find((vehicle) => vehicle.id === trackedVehicleId) ?? null,
+    [trackedVehicleId, vehicles],
+  );
 
   const start = () => {
     setAnchor({ wall: Date.now(), sim: Date.parse(journey.departAt) });
