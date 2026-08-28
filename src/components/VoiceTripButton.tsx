@@ -8,7 +8,7 @@ type VoiceState = "idle" | "requesting" | "recording" | "transcribing" | "error"
 
 interface VoiceTripButtonProps {
   disabled?: boolean;
-  onTranscript: (text: string) => void;
+  onTranscript: (text: string) => void | Promise<void>;
 }
 
 function recordingFormat(): string | undefined {
@@ -69,9 +69,9 @@ export default function VoiceTripButton({
       if (!response.ok || !data.text) {
         throw new Error(data.message || "Could not transcribe that recording.");
       }
-      onTranscript(data.text);
+      await onTranscript(data.text);
       setState("idle");
-      setMessage("Transcript ready — check it, then fill the boxes.");
+      setMessage("Transcript processed — check the route boxes.");
     } catch (error) {
       setState("error");
       setMessage(

@@ -133,15 +133,15 @@ export default function HomePage() {
     })();
   }
 
-  async function parseTrip() {
-    if (nlText.trim().length < 4) return;
+  async function parseTrip(text = nlText) {
+    if (text.trim().length < 4) return;
     setNlBusy(true);
     setNlNote(null);
     try {
       const res = await fetch("/api/ai/preferences", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: nlText }),
+        body: JSON.stringify({ text }),
       });
       const prefs = (await res.json()) as PrefsResponse;
 
@@ -304,13 +304,7 @@ export default function HomePage() {
             <span className="mr-2 inline-block h-2 w-2 bg-saffron align-middle" aria-hidden />
             Or just describe your trip <span className="font-normal text-ink-3">(beta)</span>
           </summary>
-          <form
-            className="mt-3 space-y-2"
-            onSubmit={(e) => {
-              e.preventDefault();
-              void parseTrip();
-            }}
-          >
+          <div className="mt-3 space-y-2">
             <textarea
               value={nlText}
               onChange={(e) => setNlText(e.target.value)}
@@ -324,25 +318,17 @@ export default function HomePage() {
               onTranscript={(text) => {
                 setNlText(text);
                 setNlNote(null);
+                return parseTrip(text);
               }}
             />
-            <div className="flex items-center gap-3">
-              <button
-                type="submit"
-                disabled={nlBusy || nlText.trim().length < 4}
-                className="rounded-[2px] bg-ink px-4 py-2 text-sm font-semibold text-paper hover:opacity-90 disabled:opacity-40"
-              >
-                {nlBusy ? "Parsing…" : "Fill the boxes for me"}
-              </button>
-              {nlNote && (
-                <p className="text-xs text-ink-3" role="status">{nlNote}</p>
-              )}
-            </div>
+            {nlNote && (
+              <p className="text-xs text-ink-3" role="status">{nlNote}</p>
+            )}
             <p className="text-[11px] text-ink-3">
               AI only extracts your constraints. Routes, fares and times are
               always computed by the deterministic planner.
             </p>
-          </form>
+          </div>
         </details>
       </section>
 
